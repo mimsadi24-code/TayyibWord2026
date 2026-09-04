@@ -1,28 +1,106 @@
 workflows:
-  tayyib_word_debug:
-    name: Tayyib Word Debug APK
-    max_build_duration: 60
+tayyib_word_debug:
+name: Tayyib Word Debug APK
+max_build_duration: 60
 
-    environment:
-      flutter: stable
-      java: 17
+environment:
+  flutter: stable
+  java: 17
 
-    scripts:
-      - name: Fix Android SDK
-        script: |
-          python3 -c "from pathlib import Path; p=Path('android/app/build.gradle.kts'); s=p.read_text(); p.write_text(s.replace('compileSdk = 34','compileSdk = 36').replace('targetSdk = 34','targetSdk = 36'))"
+scripts:
+  - name: Fix Android SDK
+    script: |
+      python3 -c "from pathlib import Path; p=Path('android/app/build.gradle.kts'); s=p.read_text(); p.write_text(s.replace('compileSdk = 34','compileSdk = 36').replace('targetSdk = 34','targetSdk = 36'))"
 
-      - name: Fix Dart compatibility
-        script: |
-          python3 -c "from pathlib import Path; p=Path('lib/main.dart'); s=p.read_text(); marker='double imageWidth = 420, imageHeight = 240;'; s=s.replace(marker, marker + \"\\ndouble objectX = 0, objectY = 0, objectRotation = 0;\\nString objectWrap = 'In Line';\") if marker in s and 'double objectX = 0, objectY = 0, objectRotation = 0;' not in s else s; s=s.replace('              readOnly: documentProtected,',''); s=s.replace('math.min(120, math.max(5, vals[i] * 2))','math.min(120.0, math.max(5.0, vals[i] * 2.0))'); s=s.replace('math.min(120, math.max(5, vals[i-1] * 2))','math.min(120.0, math.max(5.0, vals[i-1] * 2.0))'); p.write_text(s)"
+  - name: Fix Dart compatibility
+    script: |
+      python3 <<'PY'
+      from pathlib import Path
 
-      - name: Get packages
-        script: |
-          flutter pub get
+      p = Path("lib/main.dart")
+      s = p.read_text()
 
-      - name: Build APK
-        script: |
-          flutter build apk --debug
+      # Missing object state fields
+      marker = "double imageWidth = 420, imageHeight = 240;"
+      if marker in s and "double objectX = 0, objectY = 0, objectRotation = 0;" not in s:
+          s = s.replace(
+              marker,
+              marker + "\n"
+              "double objectX = 0, objectY = 0, objectRotation = 0;\n"
+              "String objectWrap = 'In Line';"
+          )
 
-    artifacts:
-      - build/app/outputs/flutter-apk/app-debug.apk
+      # flutter_quill 11.5.1 compatibility
+      s = s.replace(
+          "              readOnly: documentProtected,",
+          ""
+      )
+
+      # QuillController selection parameter
+      if "document: doc,\n    );" in s:
+          s = s.replace(
+              "document: doc,\n    );",
+              "document: doc,\n"
+              "      selection: const TextSelection.collapsed(offset: 0),\n"
+              "    );"
+          )
+
+      # PDF API compatibility
+      if "import 'package:pdf/pdf.dart';" not in s:
+          s = s.replace(
+              "import 'package:pdf/widgets.dart' as pw;",
+              "import 'package:pdf/pdf.dart';\n"
+              "import 'package:pdf/widgets.dart' as pw;"
+          )
+
+      s = s.replace("pw.PdfPageFormat", "PdfPageFormat")
+
+      # Other API compatibility
+      s = s.replace("onTap: insertToc", "onTap: generateToc")
+      s = s.replace(
+          "btn(Icons.note_outlined, 'Endnote', insertEndnote)",
+          "btn(Icons.note_outlined, 'Endnote', ()=>insertFootnote(endnote:true))"
+      )
+      s = s.replace("Icons.format_drop_cap", "Icons.text_fields")
+
+      # Chart num -> double
+      s = s.replace(
+          "math.min(120, math.max(5, vals[i] * 2))",
+          "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
+      )
+      s = s.replace(
+          "math.min(120, math.max(5, vals[i-1] * 2))",
+          "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
+      )
+
+      # Fix the broken tracked-change dialog string.
+      broken = """content:Text('Before:
+
+${ch.before}
+
+After:
+${ch.after}')"""
+
+      fixed = """content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')"""
+
+      s = s.replace(broken, fixed)
+
+      # Also handle the escaped/newline variant.
+      s = s.replace(
+          "content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')",
+          fixed
+      )
+
+      p.write_text(s)
+      PY
+
+  - name: Get packages
+    script: |
+      flutter pub get
+
+  - name: Build APK
+    script: |
+      flutter build apk --debug
+
+artifacts:
+  - build/app/outputs/flutter-apk/app-debug.apk
