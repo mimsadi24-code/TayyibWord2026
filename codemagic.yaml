@@ -8,16 +8,15 @@ workflows:
       java: 17
 
     scripts:
-      - name: Fix Gradle wrapper
+      - name: Fix Android SDK
         script: |
-          sed -i '1s|^#!.*|#!/usr/bin/env bash|' android/gradlew
-          chmod +x android/gradlew
+          python3 -c "from pathlib import Path; p=Path('android/app/build.gradle.kts'); s=p.read_text(); p.write_text(s.replace('compileSdk = 34','compileSdk = 36').replace('targetSdk = 34','targetSdk = 36'))"
 
-      - name: Get Flutter packages
+      - name: Get packages
         script: |
           flutter pub get
 
-      - name: Build Debug APK
+      - name: Build APK
         script: |
           flutter build apk --debug
 
