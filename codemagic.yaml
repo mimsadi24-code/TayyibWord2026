@@ -10,89 +10,16 @@ environment:
 scripts:
   - name: Fix Android SDK
     script: |
-      python3 -c "from pathlib import Path; p=Path('android/app/build.gradle.kts'); s=p.read_text(); p.write_text(s.replace('compileSdk = 34','compileSdk = 36').replace('targetSdk = 34','targetSdk = 36'))"
+      sed -i 's/compileSdk = 34/compileSdk = 36/' android/app/build.gradle.kts
+      sed -i 's/targetSdk = 34/targetSdk = 36/' android/app/build.gradle.kts
 
-  - name: Fix Dart compatibility
+  - name: Fix Dart source
     script: |
-      python3 <<'PY'
-      from pathlib import Path
-
-      p = Path("lib/main.dart")
-      s = p.read_text()
-
-      # Missing object state fields
-      marker = "double imageWidth = 420, imageHeight = 240;"
-      if marker in s and "double objectX = 0, objectY = 0, objectRotation = 0;" not in s:
-          s = s.replace(
-              marker,
-              marker + "\n"
-              "double objectX = 0, objectY = 0, objectRotation = 0;\n"
-              "String objectWrap = 'In Line';"
-          )
-
-      # flutter_quill 11.5.1 compatibility
-      s = s.replace(
-          "              readOnly: documentProtected,",
-          ""
-      )
-
-      # QuillController selection parameter
-      if "document: doc,\n    );" in s:
-          s = s.replace(
-              "document: doc,\n    );",
-              "document: doc,\n"
-              "      selection: const TextSelection.collapsed(offset: 0),\n"
-              "    );"
-          )
-
-      # PDF API compatibility
-      if "import 'package:pdf/pdf.dart';" not in s:
-          s = s.replace(
-              "import 'package:pdf/widgets.dart' as pw;",
-              "import 'package:pdf/pdf.dart';\n"
-              "import 'package:pdf/widgets.dart' as pw;"
-          )
-
-      s = s.replace("pw.PdfPageFormat", "PdfPageFormat")
-
-      # Other API compatibility
-      s = s.replace("onTap: insertToc", "onTap: generateToc")
-      s = s.replace(
-          "btn(Icons.note_outlined, 'Endnote', insertEndnote)",
-          "btn(Icons.note_outlined, 'Endnote', ()=>insertFootnote(endnote:true))"
-      )
-      s = s.replace("Icons.format_drop_cap", "Icons.text_fields")
-
-      # Chart num -> double
-      s = s.replace(
-          "math.min(120, math.max(5, vals[i] * 2))",
-          "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
-      )
-      s = s.replace(
-          "math.min(120, math.max(5, vals[i-1] * 2))",
-          "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
-      )
-
-      # Fix the broken tracked-change dialog string.
-      broken = """content:Text('Before:
-
-${ch.before}
-
-After:
-${ch.after}')"""
-
-      fixed = """content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')"""
-
-      s = s.replace(broken, fixed)
-
-      # Also handle the escaped/newline variant.
-      s = s.replace(
-          "content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')",
-          fixed
-      )
-
-      p.write_text(s)
-      PY
+      sed -i '/readOnly: documentProtected,/d' lib/main.dart
+      sed -i "s/Icons.format_drop_cap/Icons.text_fields/g" lib/main.dart
+      sed -i "s/onTap: insertToc/onTap: generateToc/g" lib/main.dart
+      sed -i "s/math.min(120, math.max(5, valsi \* 2))/math.min(120.0, math.max(5.0, vals[i] * 2.0))/g" lib/main.dart
+      sed -i "s/math.min(120, math.max(5, valsi-1 \* 2))/math.min(120.0, math.max(5.0, vals[i-1] * 2.0))/g" lib/main.dart
 
   - name: Get packages
     script: |
