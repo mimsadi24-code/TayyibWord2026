@@ -15,11 +15,11 @@ scripts:
 
   - name: Fix Dart source
     script: |
-      sed -i '/readOnly: documentProtected,/d' lib/main.dart
-      sed -i "s/Icons.format_drop_cap/Icons.text_fields/g" lib/main.dart
-      sed -i "s/onTap: insertToc/onTap: generateToc/g" lib/main.dart
-      sed -i "s/math.min(120, math.max(5, valsi \* 2))/math.min(120.0, math.max(5.0, vals[i] * 2.0))/g" lib/main.dart
-      sed -i "s/math.min(120, math.max(5, valsi-1 \* 2))/math.min(120.0, math.max(5.0, vals[i-1] * 2.0))/g" lib/main.dart
+      python3 -c "from pathlib import Path; p=Path('lib/main.dart'); s=p.read_text(); s=s.replace('              readOnly: documentProtected,',''); s=s.replace('Icons.format_drop_cap','Icons.text_fields'); s=s.replace('onTap: insertToc','onTap: generateToc'); s=s.replace('math.min(120, math.max(5, vals[i] * 2))','math.min(120.0, math.max(5.0, vals[i] * 2.0))'); s=s.replace('math.min(120, math.max(5, vals[i-1] * 2))','math.min(120.0, math.max(5.0, vals[i-1] * 2.0))'); p.write_text(s)"
+
+  - name: Fix tracked change dialog
+    script: |
+      python3 -c "from pathlib import Path; p=Path('lib/main.dart'); s=p.read_text(); start=s.find(\"content:Text('Before:\"); end=s.find(\"'),actions:\", start); s=s[:start]+\"content:Text('Before:\\\\n\\${ch.before}\\\\n\\\\nAfter:\\\\n\\${ch.after}'\"+s[end:]; p.write_text(s)"
 
   - name: Get packages
     script: |
