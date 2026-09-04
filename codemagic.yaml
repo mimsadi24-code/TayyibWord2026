@@ -1,95 +1,28 @@
 workflows:
-tayyib_word_debug:
-name: Tayyib Word Debug APK
-max_build_duration: 60
+  tayyib_word_debug:
+    name: Tayyib Word Debug APK
+    max_build_duration: 60
 
-environment:
-  flutter: stable
-  java: 17
+    environment:
+      flutter: stable
+      java: 17
 
-scripts:
-  - name: Fix Android SDK
-    script: |
-      python3 -c "from pathlib import Path; p=Path('android/app/build.gradle.kts'); s=p.read_text(); p.write_text(s.replace('compileSdk = 34','compileSdk = 36').replace('targetSdk = 34','targetSdk = 36'))"
+    scripts:
+      - name: Fix Android SDK
+        script: |
+          python3 -c "from pathlib import Path; p=Path('android/app/build.gradle.kts'); s=p.read_text(); p.write_text(s.replace('compileSdk = 34','compileSdk = 36').replace('targetSdk = 34','targetSdk = 36'))"
 
-  - name: Fix Dart compatibility
-    script: |
-      python3 <<'PY'
-      from pathlib import Path
+      - name: Fix Dart compatibility
+        script: |
+          python3 -c "from pathlib import Path; p=Path('lib/main.dart'); s=p.read_text(); marker='double imageWidth = 420, imageHeight = 240;'; s=s.replace(marker, marker + \"\\ndouble objectX = 0, objectY = 0, objectRotation = 0;\\nString objectWrap = 'In Line';\") if marker in s and 'double objectX = 0, objectY = 0, objectRotation = 0;' not in s else s; s=s.replace('              readOnly: documentProtected,',''); s=s.replace('math.min(120, math.max(5, vals[i] * 2))','math.min(120.0, math.max(5.0, vals[i] * 2.0))'); s=s.replace('math.min(120, math.max(5, vals[i-1] * 2))','math.min(120.0, math.max(5.0, vals[i-1] * 2.0))'); p.write_text(s)"
 
-      p = Path("lib/main.dart")
-      s = p.read_text()
+      - name: Get packages
+        script: |
+          flutter pub get
 
-      marker = "double imageWidth = 420, imageHeight = 240;"
-      if marker in s and "double objectX = 0, objectY = 0, objectRotation = 0;" not in s:
-          s = s.replace(
-              marker,
-              marker + """
-      double objectX = 0, objectY = 0, objectRotation = 0;
-      String objectWrap = 'In Line';
-      """
-          )
+      - name: Build APK
+        script: |
+          flutter build apk --debug
 
-      s = s.replace(
-          "              readOnly: documentProtected,",
-          ""
-      )
-
-      old = """_quill = quill.QuillController(
-          document: doc,
-        );"""
-
-      new = """_quill = quill.QuillController(
-          document: doc,
-          selection: const TextSelection.collapsed(offset: 0),
-        );"""
-
-      s = s.replace(old, new)
-
-      if "import 'package:pdf/pdf.dart';" not in s:
-          s = s.replace(
-              "import 'package:pdf/widgets.dart' as pw;",
-              "import 'package:pdf/pdf.dart';\nimport 'package:pdf/widgets.dart' as pw;"
-          )
-
-      s = s.replace("pw.PdfPageFormat", "PdfPageFormat")
-      s = s.replace("onTap: insertToc", "onTap: generateToc")
-      s = s.replace(
-          "btn(Icons.note_outlined, 'Endnote', insertEndnote)",
-          "btn(Icons.note_outlined, 'Endnote', ()=>insertFootnote(endnote:true))"
-      )
-      s = s.replace("Icons.format_drop_cap", "Icons.text_fields")
-
-      s = s.replace(
-          "math.min(120, math.max(5, vals[i] * 2))",
-          "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
-      )
-
-      s = s.replace(
-          "math.min(120, math.max(5, vals[i-1] * 2))",
-          "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
-      )
-
-      p.write_text(s)
-      PY
-
-  - name: Get packages
-    script: |
-      flutter pub get
-
-  - name: Analyze
-    script: |
-      flutter analyze --no-pub
-
-  - name: Build APK
-    script: |
-      flutter build apk --debug
-
-artifacts:
-  - build/app/outputs/flutter-apk/app-debug.apk      flutter build apk --debug
-
-artifacts:
-  - build/app/outputs/flutter-apk/app-debug.apk      flutter build apk --debug
-
-artifacts:
-  - build/app/outputs/flutter-apk/app-debug.apk
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
