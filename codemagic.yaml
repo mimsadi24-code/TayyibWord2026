@@ -1,0 +1,25 @@
+workflows:
+  tayyib_word_debug:
+    name: Tayyib Word Debug APK
+    max_build_duration: 60
+
+    environment:
+      flutter: stable
+      java: 17
+
+    scripts:
+      - name: Fix Gradle wrapper
+        script: |
+          sed -i '1s|^#!.*|#!/usr/bin/env bash|' android/gradlew
+          chmod +x android/gradlew
+
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Build Debug APK
+        script: |
+          flutter build apk --debug
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
