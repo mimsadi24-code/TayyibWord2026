@@ -95,4 +95,7 @@ scripts:
       flutter build apk --debug
 
 artifacts:
+  - build/app/outputs/flutter-apk/app-debug.apk      flutter build apk --debug
+
+artifacts:
   - build/app/outputs/flutter-apk/app-debug.apk
