@@ -1,0 +1,35 @@
+name: tayyib_word_desktop
+description: Desktop-class Word-style editor UI for Android
+publish_to: "none"
+version: 1.0.0+21
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  path_provider: ^2.1.5
+  image_picker: ^1.2.1
+  file_picker: ^10.3.2
+  url_launcher: ^6.3.2
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  archive: ^4.0.7
+  flutter_quill: ^11.5.1
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/tayyib_word_logo.png
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/tayyib_word_logo.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/tayyib_word_logo.png
