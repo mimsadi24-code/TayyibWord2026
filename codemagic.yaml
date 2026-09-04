@@ -20,7 +20,6 @@ scripts:
       p = Path("lib/main.dart")
       s = p.read_text()
 
-      # Add missing object-position fields.
       marker = "double imageWidth = 420, imageHeight = 240;"
       if marker in s and "double objectX = 0, objectY = 0, objectRotation = 0;" not in s:
           s = s.replace(
@@ -31,31 +30,29 @@ scripts:
       """
           )
 
-      # flutter_quill 11.5.1: readOnly is no longer a QuillEditorConfig parameter.
       s = s.replace(
           "              readOnly: documentProtected,",
           ""
       )
 
-      # Use the current QuillController constructor API.
       old = """_quill = quill.QuillController(
           document: doc,
         );"""
+
       new = """_quill = quill.QuillController(
           document: doc,
           selection: const TextSelection.collapsed(offset: 0),
         );"""
+
       s = s.replace(old, new)
 
-      # Fix PDF page format import/API.
       if "import 'package:pdf/pdf.dart';" not in s:
           s = s.replace(
               "import 'package:pdf/widgets.dart' as pw;",
               "import 'package:pdf/pdf.dart';\nimport 'package:pdf/widgets.dart' as pw;"
           )
-      s = s.replace("pw.PdfPageFormat", "PdfPageFormat")
 
-      # Replace APIs/icons unavailable in current packages.
+      s = s.replace("pw.PdfPageFormat", "PdfPageFormat")
       s = s.replace("onTap: insertToc", "onTap: generateToc")
       s = s.replace(
           "btn(Icons.note_outlined, 'Endnote', insertEndnote)",
@@ -63,20 +60,14 @@ scripts:
       )
       s = s.replace("Icons.format_drop_cap", "Icons.text_fields")
 
-      # Fix numeric type inference for chart drawing.
       s = s.replace(
           "math.min(120, math.max(5, vals[i] * 2))",
           "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
       )
+
       s = s.replace(
           "math.min(120, math.max(5, vals[i-1] * 2))",
           "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
-      )
-
-      # Fix broken multiline string if present.
-      s = s.replace(
-          "content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')",
-          "content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')"
       )
 
       p.write_text(s)
@@ -93,6 +84,9 @@ scripts:
   - name: Build APK
     script: |
       flutter build apk --debug
+
+artifacts:
+  - build/app/outputs/flutter-apk/app-debug.apk      flutter build apk --debug
 
 artifacts:
   - build/app/outputs/flutter-apk/app-debug.apk      flutter build apk --debug
