@@ -35,22 +35,18 @@ workflows:
               s = p.read_text()
 
               marker = "  String shapeKind = '';"
+
               if marker in s and "double objectX = 0;" not in s:
                   s = s.replace(
                       marker,
-                      marker + """
-  double objectX = 0;
-  double objectY = 0;
-  double objectRotation = 0;"""
+                      marker
+                      + "\n  double objectX = 0;"
+                      + "\n  double objectY = 0;"
+                      + "\n  double objectRotation = 0;"
                   )
 
-              broken = """content:Text('Before:
-${ch.before}
-
-After:
-${ch.after}')"""
-
-              fixed = r"""content:Text('Before:\n${ch.before}\n\nAfter:\n${ch.after}')"""
+              broken = "content:Text('Before:\n${ch.before}\n\nAfter:\n${ch.after}')"
+              fixed = "content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')"
 
               s = s.replace(broken, fixed)
 
@@ -93,6 +89,11 @@ ${ch.after}')"""
           flutter analyze --no-fatal-infos || true
 
       - name: Build Debug APK
+        script: |
+          flutter build apk --debug
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk      - name: Build Debug APK
         script: |
           flutter build apk --debug
 
