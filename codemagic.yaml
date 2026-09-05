@@ -34,56 +34,41 @@ workflows:
           if p.exists():
               s = p.read_text()
 
-              # Add missing object position/rotation variables.
               marker = "  String shapeKind = '';"
               if marker in s and "double objectX = 0;" not in s:
                   s = s.replace(
                       marker,
-                      marker
-                      + "\n  double objectX = 0;"
-                      + "\n  double objectY = 0;"
-                      + "\n  double objectRotation = 0;"
+                      marker + """
+  double objectX = 0;
+  double objectY = 0;
+  double objectRotation = 0;"""
                   )
 
-              # Fix broken multiline Before/After Dart string.
               broken = """content:Text('Before:
 ${ch.before}
 
 After:
 ${ch.after}')"""
 
-              fixed = "content:Text('Before:\\n${ch.before}\\n\\nAfter:\\n${ch.after}')"
+              fixed = r"""content:Text('Before:\n${ch.before}\n\nAfter:\n${ch.after}')"""
 
               s = s.replace(broken, fixed)
 
-              # Extra repair for the same problem if spaces/newlines differ.
-              if "content:Text('Before:\n${ch.before}" in s:
-                  start = s.find("content:Text('Before:\n${ch.before}")
-                  if start != -1:
-                      end = s.find("')", start)
-                      if end != -1:
-                          old = s[start:end + 2]
-                          s = s.replace(old, fixed, 1)
-
-              # Fix protected document editor issue.
               s = s.replace(
                   "readOnly: documentProtected,",
                   ""
               )
 
-              # Fix unavailable icon.
               s = s.replace(
                   "Icons.format_drop_cap",
                   "Icons.text_fields"
               )
 
-              # Fix TOC callback name.
               s = s.replace(
                   "onTap: insertToc",
                   "onTap: generateToc"
               )
 
-              # Fix double/int math errors.
               s = s.replace(
                   "math.min(120, math.max(5, vals[i] * 2))",
                   "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
@@ -93,6 +78,26 @@ ${ch.after}')"""
                   "math.min(120, math.max(5, vals[i-1] * 2))",
                   "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
               )
+
+              p.write_text(s)
+
+          print("Dart source fixed.")
+          PY
+
+      - name: Get packages
+        script: |
+          flutter pub get
+
+      - name: Analyze project
+        script: |
+          flutter analyze --no-fatal-infos || true
+
+      - name: Build Debug APK
+        script: |
+          flutter build apk --debug
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk              )
 
               p.write_text(s)
 
