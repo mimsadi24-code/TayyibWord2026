@@ -1,33 +1,65 @@
 workflows:
-tayyib_word_debug:
-name: Tayyib Word Debug APK
-max_build_duration: 60
+  tayyib_word_debug:
+    name: Tayyib Word Debug APK
+    max_build_duration: 60
 
-environment:
-  flutter: stable
-  java: 17
+    environment:
+      flutter: stable
+      java: 17
 
-scripts:
-  - name: Fix Android SDK
-    script: |
-      sed -i 's/compileSdk = 34/compileSdk = 36/' android/app/build.gradle.kts
-      sed -i 's/targetSdk = 34/targetSdk = 36/' android/app/build.gradle.kts
+    scripts:
+      - name: Fix Android SDK
+        script: |
+          sed -i 's/compileSdk = 34/compileSdk = 36/' android/app/build.gradle.kts
+          sed -i 's/targetSdk = 34/targetSdk = 36/' android/app/build.gradle.kts
 
-  - name: Fix Dart source
-    script: |
-      python3 -c "from pathlib import Path; p=Path('lib/main.dart'); s=p.read_text(); s=s.replace('              readOnly: documentProtected,',''); s=s.replace('Icons.format_drop_cap','Icons.text_fields'); s=s.replace('onTap: insertToc','onTap: generateToc'); s=s.replace('math.min(120, math.max(5, vals[i] * 2))','math.min(120.0, math.max(5.0, vals[i] * 2.0))'); s=s.replace('math.min(120, math.max(5, vals[i-1] * 2))','math.min(120.0, math.max(5.0, vals[i-1] * 2.0))'); p.write_text(s)"
+      - name: Fix Dart source
+        script: |
+          python3 - <<'PY'
+          from pathlib import Path
 
-  - name: Fix tracked change dialog
-    script: |
-      python3 -c "from pathlib import Path; p=Path('lib/main.dart'); s=p.read_text(); start=s.find(\"content:Text('Before:\"); end=s.find(\"'),actions:\", start); s=s[:start]+\"content:Text('Before:\\\\n\\${ch.before}\\\\n\\\\nAfter:\\\\n\\${ch.after}'\"+s[end:]; p.write_text(s)"
+          p = Path("lib/main.dart")
+          s = p.read_text()
 
-  - name: Get packages
-    script: |
-      flutter pub get
+          s = s.replace(
+              "readOnly: documentProtected,",
+              ""
+          )
 
-  - name: Build APK
-    script: |
-      flutter build apk --debug
+          s = s.replace(
+              "Icons.format_drop_cap",
+              "Icons.text_fields"
+          )
 
-artifacts:
-  - build/app/outputs/flutter-apk/app-debug.apk
+          s = s.replace(
+              "onTap: insertToc",
+              "onTap: generateToc"
+          )
+
+          s = s.replace(
+              "math.min(120, math.max(5, vals[i] * 2))",
+              "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
+          )
+
+          s = s.replace(
+              "math.min(120, math.max(5, vals[i-1] * 2))",
+              "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
+          )
+
+          p.write_text(s)
+          PY
+
+      - name: Get packages
+        script: |
+          flutter pub get
+
+      - name: Analyze project
+        script: |
+          flutter analyze --no-fatal-infos || true
+
+      - name: Build Debug APK
+        script: |
+          flutter build apk --debug
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
