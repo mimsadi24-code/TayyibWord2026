@@ -1,29 +1,3 @@
-workflows:
-  tayyib_word_debug:
-    name: Tayyib Word Debug APK
-    max_build_duration: 60
-
-    environment:
-      flutter: stable
-      java: 17
-
-    scripts:
-      - name: Fix Android SDK
-        script: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p = Path("android/app/build.gradle.kts")
-
-          if p.exists():
-              s = p.read_text()
-              s = s.replace("compileSdk = 34", "compileSdk = 36")
-              s = s.replace("targetSdk = 34", "targetSdk = 36")
-              p.write_text(s)
-
-          print("Android SDK configuration checked.")
-          PY
-
       - name: Fix Dart source
         script: |
           python3 - <<'PY'
@@ -33,6 +7,17 @@ workflows:
 
           if p.exists():
               s = p.read_text()
+
+              # Fix missing shape/object position and rotation fields
+              marker = "  String shapeKind = '';"
+              if marker in s and "double objectX = 0;" not in s:
+                  s = s.replace(
+                      marker,
+                      marker + """
+          double objectX = 0;
+          double objectY = 0;
+          double objectRotation = 0;"""
+                  )
 
               s = s.replace(
                   "readOnly: documentProtected,",
@@ -61,20 +46,5 @@ workflows:
 
               p.write_text(s)
 
-          print("Dart source checked.")
+          print("Dart source fixed.")
           PY
-
-      - name: Get packages
-        script: |
-          flutter pub get
-
-      - name: Analyze project
-        script: |
-          flutter analyze --no-fatal-infos || true
-
-      - name: Build Debug APK
-        script: |
-          flutter build apk --debug
-
-    artifacts:
-      - build/app/outputs/flutter-apk/app-debug.apk
