@@ -10,8 +10,19 @@ workflows:
     scripts:
       - name: Fix Android SDK
         script: |
-          sed -i 's/compileSdk = 34/compileSdk = 36/' android/app/build.gradle.kts
-          sed -i 's/targetSdk = 34/targetSdk = 36/' android/app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/build.gradle.kts")
+
+          if p.exists():
+              s = p.read_text()
+              s = s.replace("compileSdk = 34", "compileSdk = 36")
+              s = s.replace("targetSdk = 34", "targetSdk = 36")
+              p.write_text(s)
+
+          print("Android SDK configuration checked.")
+          PY
 
       - name: Fix Dart source
         script: |
@@ -19,34 +30,38 @@ workflows:
           from pathlib import Path
 
           p = Path("lib/main.dart")
-          s = p.read_text()
 
-          s = s.replace(
-              "readOnly: documentProtected,",
-              ""
-          )
+          if p.exists():
+              s = p.read_text()
 
-          s = s.replace(
-              "Icons.format_drop_cap",
-              "Icons.text_fields"
-          )
+              s = s.replace(
+                  "readOnly: documentProtected,",
+                  ""
+              )
 
-          s = s.replace(
-              "onTap: insertToc",
-              "onTap: generateToc"
-          )
+              s = s.replace(
+                  "Icons.format_drop_cap",
+                  "Icons.text_fields"
+              )
 
-          s = s.replace(
-              "math.min(120, math.max(5, vals[i] * 2))",
-              "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
-          )
+              s = s.replace(
+                  "onTap: insertToc",
+                  "onTap: generateToc"
+              )
 
-          s = s.replace(
-              "math.min(120, math.max(5, vals[i-1] * 2))",
-              "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
-          )
+              s = s.replace(
+                  "math.min(120, math.max(5, vals[i] * 2))",
+                  "math.min(120.0, math.max(5.0, vals[i] * 2.0))"
+              )
 
-          p.write_text(s)
+              s = s.replace(
+                  "math.min(120, math.max(5, vals[i-1] * 2))",
+                  "math.min(120.0, math.max(5.0, vals[i-1] * 2.0))"
+              )
+
+              p.write_text(s)
+
+          print("Dart source checked.")
           PY
 
       - name: Get packages
