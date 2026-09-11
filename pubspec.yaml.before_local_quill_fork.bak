@@ -1,0 +1,42 @@
+name: tayyib_word_desktop
+description: Desktop-class Word-style editor UI for Android
+publish_to: "none"
+version: 1.0.0+1
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+dependencies:
+  file_picker: 8.3.7
+  flutter:
+    sdk: flutter
+  flutter_plugin_android_lifecycle: 2.0.22
+  flutter_quill: ^11.5.1
+  archive: ^4.0.9
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  quill_native_bridge: 11.1.0
+  url_launcher_android: 6.3.5
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/tayyib_word_logo.png
+  fonts:
+    - family: NotoSansBengali
+      fonts:
+        - asset: assets/fonts/NotoSansBengali-Regular.ttf
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/tayyib_word_logo.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/tayyib_word_logo.png
+
+
+dependency_overrides:
+  quill_native_bridge_android:
+    path: local_plugins/quill_native_bridge_android

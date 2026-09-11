@@ -1,0 +1,179 @@
+name: TayyibWord Android ARM64 Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Check Linux build host
+        run: |
+          set -eux
+          uname -a
+          uname -m
+          nproc
+          free -h
+          df -h
+
+      - name: Checkout Collabora Online
+        run: |
+          set -eux
+          git clone --depth 1 --branch main \
+            https://gerrit.collaboraoffice.com/online \
+            collabora-online
+          cd collabora-online
+          git rev-parse HEAD
+
+      - name: Install build dependencies
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake build-essential ant \
+            ccache cmake curl flex gperf \
+            libtool pkg-config uuid-dev \
+            python3 python3-dev python3-lxml python3-polib \
+            unzip zip wget git \
+            bison gawk gettext \
+            libssl-dev libxml2-dev \
+            libfontconfig1-dev libfreetype6-dev \
+            libx11-dev libxext-dev libxrender-dev \
+            libxcb1-dev libxcb-render0-dev \
+            libxcb-shm0-dev libxcb-xfixes0-dev
+
+      - name: Install Android SDK and NDK
+        env:
+          ANDROID_HOME: /home/runner/android-sdk
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
+        run: |
+          set -eux
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          cd "$ANDROID_HOME"
+
+          wget -q \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
+            -O cmdline-tools.zip
+
+          unzip -q cmdline-tools.zip -d cmdline-tools
+          rm -f cmdline-tools.zip
+          rm -rf cmdline-tools/latest
+          mv cmdline-tools/cmdline-tools cmdline-tools/latest
+
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+          yes | sdkmanager --licenses >/dev/null || true
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-30" \
+            "build-tools;30.0.3" \
+            "ndk;27.2.12479018"
+
+          test -d "$ANDROID_HOME/ndk/27.2.12479018"
+          grep 'Pkg.Revision' \
+            "$ANDROID_HOME/ndk/27.2.12479018/source.properties"
+
+      - name: Configure ARM64 engine
+        working-directory: collabora-online/engine
+        env:
+          ANDROID_HOME: /home/runner/android-sdk
+        run: |
+          set -eux
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+          cat > autogen.input <<CFG
+          --build=x86_64-unknown-linux-gnu
+          --with-android-ndk=$ANDROID_HOME/ndk/27.2.12479018
+          --with-android-sdk=$ANDROID_HOME
+          --enable-sal-log
+          --enable-dbgutil
+          --with-distro=CPAndroidAarch64
+          CFG
+
+          cat autogen.input
+          ./autogen.sh
+
+      - name: Build ARM64 engine
+        working-directory: collabora-online/engine
+        env:
+          MAKEFLAGS: -j2
+        run: |
+          set -eux
+          make -j2
+
+      - name: Verify ARM64 native engine
+        working-directory: collabora-online/engine
+        run: |
+          set -eux
+          test -f instdir/program/setuprc
+          test -f android/obj/local/arm64-v8a/liblo-native-code.so
+          file android/obj/local/arm64-v8a/liblo-native-code.so
+          echo "ARM64 Collabora engine verified."
+
+      - name: Configure Collabora Android build
+        working-directory: collabora-online
+        env:
+          ANDROID_HOME: /home/runner/android-sdk
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
+        run: |
+          set -eux
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+          ./autogen.sh
+
+          ./configure \
+            --enable-androidapp \
+            --with-lo-builddir="$GITHUB_WORKSPACE/collabora-online/engine" \
+            --enable-debug \
+            --with-android-abi=arm64-v8a \
+            --with-app-name="TayyibWord" \
+            --with-app-package-name="com.mimsadi24.tayyibword"
+
+      - name: Build Collabora Android libraries
+        working-directory: collabora-online
+        env:
+          ANDROID_HOME: /home/runner/android-sdk
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
+        run: |
+          set -eux
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          make -j2
+
+      - name: Build Android AAR/APK
+        working-directory: collabora-online/android
+        env:
+          ANDROID_HOME: /home/runner/android-sdk
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
+        run: |
+          set -eux
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+          ./gradlew :lib:assembleDebug --stacktrace
+
+      - name: Verify build artifacts
+        run: |
+          set -eux
+          echo "===== APK ====="
+          find "$GITHUB_WORKSPACE/collabora-online" \
+            -type f -name "*.apk" -print
+
+          echo "===== AAR ====="
+          find "$GITHUB_WORKSPACE/collabora-online" \
+            -type f -name "*.aar" -print
+
+          test "$(find "$GITHUB_WORKSPACE/collabora-online" -type f -name "*.aar" | wc -l)" -gt 0
+
+      - name: Upload TayyibWord Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TayyibWord-ARM64-Collabora
+          path: |
+            collabora-online/**/*.apk
+            collabora-online/**/*.aar
+          if-no-files-found: error
