@@ -24,7 +24,7 @@ jobs:
         run: |
           set -eux
           git clone --depth 1 --branch main \
-            https://gerrit.collaboraoffice.com/online \
+            https://github.com/CollaboraOnline/online.mirror.git \
             collabora-online
           cd collabora-online
           git rev-parse HEAD
