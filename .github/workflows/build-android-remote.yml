@@ -29,6 +29,17 @@ jobs:
           cd collabora-online
           git rev-parse HEAD
 
+      - name: Restore Collabora build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            collabora-online/engine/instdir
+            collabora-online/engine/android
+            collabora-online/engine/workdir
+          key: collabora-arm64-${{ hashFiles('.github/workflows/build-android-remote.yml') }}
+          restore-keys: |
+            collabora-arm64-
+
       - name: Install build dependencies
         run: |
           set -eux
@@ -104,7 +115,11 @@ jobs:
           MAKEFLAGS: -j2
         run: |
           set -eux
-          make -j2
+          if [ -f android/obj/local/arm64-v8a/liblo-native-code.so ]; then
+            echo "Cached ARM64 engine found — skipping rebuild."
+          else
+            make -j2
+          fi
 
       - name: Verify ARM64 native engine
         working-directory: collabora-online/engine
