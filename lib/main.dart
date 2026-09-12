@@ -13,9 +13,7 @@ class TayyibWord2007 extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: false,
         fontFamily: 'Arial',
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1F4E79),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1F4E79)),
       ),
       home: const WordWindow(),
     );
@@ -131,7 +129,7 @@ const tabs = <RibbonTab>[
       RibbonItem(Icons.stay_current_landscape, 'Orientation'),
       RibbonItem(Icons.article, 'Size'),
       RibbonItem(Icons.view_week, 'Columns'),
-      RibbonItem(Icons.breaking_news, 'Breaks'),
+      RibbonItem(Icons.description, 'Breaks'),
       RibbonItem(Icons.line_style, 'Line Numbers'),
       RibbonItem(Icons.text_rotation_none, 'Hyphenation'),
     ]),
@@ -147,10 +145,10 @@ const tabs = <RibbonTab>[
       RibbonItem(Icons.arrow_downward, 'Spacing After'),
     ]),
     RibbonGroup('Arrange', [
-      RibbonItem(Icons.position_top_right, 'Position', large: true),
+      RibbonItem(Icons.open_with, 'Position', large: true),
       RibbonItem(Icons.wrap_text, 'Wrap Text'),
-      RibbonItem(Icons.bring_to_front, 'Bring Forward'),
-      RibbonItem(Icons.send_to_back, 'Send Backward'),
+      RibbonItem(Icons.flip_to_front, 'Bring Forward'),
+      RibbonItem(Icons.flip_to_back, 'Send Backward'),
       RibbonItem(Icons.align_horizontal_left, 'Align'),
       RibbonItem(Icons.grid_3x3, 'Group'),
       RibbonItem(Icons.rotate_right, 'Rotate'),
@@ -178,7 +176,7 @@ const tabs = <RibbonTab>[
       RibbonItem(Icons.label, 'Insert Caption', large: true),
       RibbonItem(Icons.list, 'Table of Figures'),
       RibbonItem(Icons.update, 'Update Table'),
-      RibbonItem(Icons.crossword, 'Cross-reference'),
+      RibbonItem(Icons.link, 'Cross-reference'),
     ]),
     RibbonGroup('Index', [
       RibbonItem(Icons.bookmarks, 'Mark Entry', large: true),
@@ -206,8 +204,8 @@ const tabs = <RibbonTab>[
       RibbonItem(Icons.person_add, 'Address Block', large: true),
       RibbonItem(Icons.text_fields, 'Greeting Line'),
       RibbonItem(Icons.add_circle_outline, 'Insert Merge Field'),
-      RibbonItem(Icons.rules, 'Rules'),
-      RibbonItem(Icons.match_case, 'Match Fields'),
+      RibbonItem(Icons.rule, 'Rules'),
+      RibbonItem(Icons.text_format, 'Match Fields'),
       RibbonItem(Icons.refresh, 'Update Labels'),
     ]),
     RibbonGroup('Preview Results', [
@@ -227,7 +225,7 @@ const tabs = <RibbonTab>[
       RibbonItem(Icons.menu_book, 'Research'),
       RibbonItem(Icons.translate, 'Translate'),
       RibbonItem(Icons.language, 'Language'),
-      RibbonItem(Icons.word, 'Word Count'),
+      RibbonItem(Icons.numbers, 'Word Count'),
     ]),
     RibbonGroup('Comments', [
       RibbonItem(Icons.comment, 'New Comment', large: true),
@@ -265,7 +263,7 @@ const tabs = <RibbonTab>[
       RibbonItem(Icons.description, 'Draft', large: true),
     ]),
     RibbonGroup('Show/Hide', [
-      RibbonItem(Icons.ruler, 'Ruler', large: true),
+      RibbonItem(Icons.straighten, 'Ruler', large: true),
       RibbonItem(Icons.grid_on, 'Gridlines'),
       RibbonItem(Icons.navigation, 'Navigation Pane'),
       RibbonItem(Icons.mark_unread_chat_alt, 'Message Bar'),
@@ -338,8 +336,11 @@ class _WordWindowState extends State<WordWindow> {
                       ),
                     ),
                   ),
-                  const Icon(Icons.help_outline,
-                      color: Colors.white70, size: 20),
+                  const Icon(
+                    Icons.help_outline,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                 ],
               ),
@@ -350,10 +351,7 @@ class _WordWindowState extends State<WordWindow> {
               height: 39,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Color(0xFFEEF3F8),
-                    Color(0xFFD6E0EA),
-                  ],
+                  colors: [Color(0xFFEEF3F8), Color(0xFFD6E0EA)],
                 ),
               ),
               child: ListView(
@@ -375,10 +373,7 @@ class _WordWindowState extends State<WordWindow> {
               height: 156,
               color: const Color(0xFFEAF0F6),
               child: ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 scrollDirection: Axis.horizontal,
                 itemCount: tab.groups.length,
                 separatorBuilder: (_, __) => const VerticalDivider(
@@ -386,8 +381,7 @@ class _WordWindowState extends State<WordWindow> {
                   thickness: 1,
                   color: Color(0xFFB9C7D5),
                 ),
-                itemBuilder: (_, index) =>
-                    _group(tab.groups[index]),
+                itemBuilder: (_, index) => _group(tab.groups[index]),
               ),
             ),
 
@@ -400,9 +394,9 @@ class _WordWindowState extends State<WordWindow> {
                     width: 620,
                     height: 760,
                     margin: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: Colors.white,
-                      boxShadow: const [
+                      boxShadow: [
                         BoxShadow(
                           blurRadius: 12,
                           spreadRadius: 1,
@@ -417,9 +411,7 @@ class _WordWindowState extends State<WordWindow> {
                         child: SizedBox(
                           width: 1,
                           height: 20,
-                          child: ColoredBox(
-                            color: Color(0xFF222222),
-                          ),
+                          child: ColoredBox(color: Color(0xFF222222)),
                         ),
                       ),
                     ),
@@ -437,33 +429,20 @@ class _WordWindowState extends State<WordWindow> {
                 children: [
                   Text(
                     'Page 1 of 1',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 11),
                   ),
                   SizedBox(width: 18),
                   Text(
                     'Words: 0',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 11),
                   ),
                   Spacer(),
                   Text(
                     '100%',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 11),
                   ),
                   SizedBox(width: 8),
-                  Icon(
-                    Icons.zoom_in,
-                    color: Colors.white,
-                    size: 16,
-                  ),
+                  Icon(Icons.zoom_in, color: Colors.white, size: 16),
                 ],
               ),
             ),
@@ -480,16 +459,9 @@ class _WordWindowState extends State<WordWindow> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const RadialGradient(
-          colors: [
-            Color(0xFF4F9ACB),
-            Color(0xFF18527E),
-            Color(0xFF0B3152),
-          ],
+          colors: [Color(0xFF4F9ACB), Color(0xFF18527E), Color(0xFF0B3152)],
         ),
-        border: Border.all(
-          color: const Color(0xFF7DB7D8),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFF7DB7D8), width: 1),
       ),
       child: const Center(
         child: Text(
@@ -510,11 +482,7 @@ class _WordWindowState extends State<WordWindow> {
       child: SizedBox(
         width: 30,
         height: 36,
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 18,
-        ),
+        child: Icon(icon, color: Colors.white, size: 18),
       ),
     );
   }
@@ -530,16 +498,9 @@ class _WordWindowState extends State<WordWindow> {
           color: active ? const Color(0xFFEAF0F6) : Colors.transparent,
           border: active
               ? const Border(
-                  top: BorderSide(
-                    color: Color(0xFF3B78A8),
-                    width: 3,
-                  ),
-                  left: BorderSide(
-                    color: Color(0xFFB5C6D7),
-                  ),
-                  right: BorderSide(
-                    color: Color(0xFFB5C6D7),
-                  ),
+                  top: BorderSide(color: Color(0xFF3B78A8), width: 3),
+                  left: BorderSide(color: Color(0xFFB5C6D7)),
+                  right: BorderSide(color: Color(0xFFB5C6D7)),
                 )
               : null,
         ),
@@ -548,9 +509,7 @@ class _WordWindowState extends State<WordWindow> {
           name,
           style: TextStyle(
             fontSize: 13,
-            color: active
-                ? const Color(0xFF173A5A)
-                : const Color(0xFF2B2B2B),
+            color: active ? const Color(0xFF173A5A) : const Color(0xFF2B2B2B),
             fontWeight: active ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
@@ -581,10 +540,7 @@ class _WordWindowState extends State<WordWindow> {
               group.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF304B62),
-              ),
+              style: const TextStyle(fontSize: 10, color: Color(0xFF304B62)),
             ),
           ),
         ],
@@ -615,10 +571,7 @@ class _WordWindowState extends State<WordWindow> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 9,
-                  color: Color(0xFF263746),
-                ),
+                style: const TextStyle(fontSize: 9, color: Color(0xFF263746)),
               ),
             ],
           ),
