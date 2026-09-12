@@ -92,8 +92,8 @@ jobs:
 
           sdkmanager \
             "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0"
+            "platforms;android-37" \
+            "build-tools;36.0.0"
 
           test -d "$ANDROID_HOME/platforms/android-34"
           test -d "$ANDROID_HOME/build-tools/34.0.0"
@@ -142,13 +142,13 @@ jobs:
 
           for line in lines:
               if line.startswith("minCompileSdk="):
-                  out.append("minCompileSdk=34")
+                  out.append("minCompileSdk=37")
                   found = True
               else:
                   out.append(line)
 
           if not found:
-              out.append("minCompileSdk=34")
+              out.append("minCompileSdk=37")
 
           p.write_text("\n".join(out) + "\n")
           ' "$META"
@@ -164,7 +164,7 @@ jobs:
 
           unzip -p "$AAR" \
             META-INF/com/android/build/gradle/aar-metadata.properties \
-            | grep -qx 'minCompileSdk=34'
+            | grep -qx 'minCompileSdk=37'
 
           rm -rf "$TMP"
 
@@ -190,7 +190,7 @@ jobs:
           test -f pubspec.yaml
           test -f android/app/build.gradle.kts
           test -f android/app/libs/tayyibword-engine.aar
-          grep -q 'compileSdk = 34' android/app/build.gradle.kts
+          grep -q 'compileSdk = 37' android/app/build.gradle.kts
           grep -q 'minSdk = 26' android/app/build.gradle.kts
 
       - name: Flutter dependencies
