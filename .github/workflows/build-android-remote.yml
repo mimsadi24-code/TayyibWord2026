@@ -168,6 +168,20 @@ jobs:
 
           rm -rf "$TMP"
 
+      - name: Verify Android toolchain
+        shell: bash
+        env:
+          ANDROID_HOME: /home/runner/android-sdk
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
+        run: |
+          set -euo pipefail
+          AAPT2="$ANDROID_HOME/build-tools/34.0.0/aapt2"
+          test -x "$AAPT2"
+          "$AAPT2" version
+          test -d "$ANDROID_HOME/platforms/android-34"
+          test -d "$ANDROID_HOME/build-tools/34.0.0"
+          ! grep -Rqs "android.aapt2FromMavenOverride=/data/data/com.termux" android
+
       - name: Verify project
         working-directory: ${{ github.workspace }}
         shell: bash
