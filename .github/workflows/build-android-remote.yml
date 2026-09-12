@@ -5,64 +5,73 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 360
+    timeout-minutes: 90
 
     steps:
-      - name: Check Linux build host
-        run: |
-          set -eux
-          uname -a
-          uname -m
-          nproc
-          free -h
-          df -h
+      - name: Checkout TayyibWord
+        uses: actions/checkout@v4
 
-      - name: Checkout Collabora Online
-        run: |
-          set -eux
-          git clone --depth 1 --branch main \
-            https://github.com/CollaboraOnline/online.mirror.git \
-            collabora-online
-          cd collabora-online
-          git rev-parse HEAD
-
-      - name: Restore Collabora build cache
-        uses: actions/cache@v4
+      - name: Restore stable Collabora AAR cache
+        id: aar-cache
+        uses: actions/cache/restore@v4
         with:
-          path: |
-            collabora-online/engine/instdir
-            collabora-online/engine/android
-            collabora-online/engine/workdir
-          key: collabora-arm64-${{ hashFiles('.github/workflows/build-android-remote.yml') }}
-          restore-keys: |
-            collabora-arm64-
+          path: .engine-cache
+          key: tayyibword-collabora-aar-v1
 
-      - name: Install build dependencies
+      - name: Bootstrap AAR from last verified Collabora build
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: TayyibWord-ARM64-Collabora
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 34672627454
+          path: .bootstrap-collabora
+
+      - name: Prepare and verify Collabora AAR
+        if: steps.aar-cache.outputs.cache-hit != 'true'
         run: |
           set -eux
-          sudo apt-get update
-          sudo apt-get install -y \
-            autoconf automake build-essential ant \
-            ccache cmake curl flex gperf \
-            libtool pkg-config uuid-dev \
-            python3 python3-dev python3-lxml python3-polib \
-            unzip zip wget git \
-            bison gawk gettext \
-            libssl-dev libxml2-dev \
-            libfontconfig1-dev libfreetype6-dev \
-            libx11-dev libxext-dev libxrender-dev \
-            libxcb1-dev libxcb-render0-dev \
-            libxcb-shm0-dev libxcb-xfixes0-dev
+          mkdir -p .engine-cache
 
-      - name: Install Android SDK and NDK
+          AAR="$(find .bootstrap-collabora \
+            -type f \( -name 'lib-debug.aar' -o -name '*.aar' \) \
+            | head -n 1)"
+
+          test -n "$AAR"
+          cp "$AAR" .engine-cache/lib-debug.aar
+
+          test -s .engine-cache/lib-debug.aar
+          unzip -l .engine-cache/lib-debug.aar \
+            | grep -E 'classes.jar|AndroidManifest.xml'
+
+      - name: Save stable Collabora AAR cache
+        if: steps.aar-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .engine-cache
+          key: tayyibword-collabora-aar-v1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Android SDK
         env:
           ANDROID_HOME: /home/runner/android-sdk
           ANDROID_SDK_ROOT: /home/runner/android-sdk
         run: |
           set -eux
+
           mkdir -p "$ANDROID_HOME/cmdline-tools"
           cd "$ANDROID_HOME"
 
@@ -81,135 +90,59 @@ jobs:
 
           sdkmanager \
             "platform-tools" \
-            "platforms;android-30" \
-            "build-tools;30.0.3" \
-            "ndk;27.2.12479018"
+            "platforms;android-34" \
+            "build-tools;34.0.0"
 
-          test -d "$ANDROID_HOME/ndk/27.2.12479018"
-          grep 'Pkg.Revision' \
-            "$ANDROID_HOME/ndk/27.2.12479018/source.properties"
+          test -d "$ANDROID_HOME/platforms/android-34"
+          test -d "$ANDROID_HOME/build-tools/34.0.0"
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Configure ARM64 engine
-        working-directory: collabora-online/engine
-        env:
-          ANDROID_HOME: /home/runner/android-sdk
+      - name: Attach verified Collabora AAR
         run: |
           set -eux
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
-          cat > autogen.input <<CFG
-          --build=x86_64-unknown-linux-gnu
-          --with-android-ndk=$ANDROID_HOME/ndk/27.2.12479018
-          --with-android-sdk=$ANDROID_HOME
-          --enable-sal-log
-          --enable-dbgutil
-          --with-distro=CPAndroidAarch64
-          CFG
+          test -s "$GITHUB_WORKSPACE/.engine-cache/lib-debug.aar"
 
-          cat autogen.input
-          ./autogen.sh
-
-      - name: Build ARM64 engine
-        working-directory: collabora-online/engine
-        env:
-          MAKEFLAGS: -j2
-        run: |
-          set -eux
-          if [ -f android/obj/local/arm64-v8a/liblo-native-code.so ]; then
-            echo "Cached ARM64 engine found — skipping rebuild."
-          else
-            make -j2
-          fi
-
-      - name: Verify ARM64 native engine
-        working-directory: collabora-online/engine
-        run: |
-          set -eux
-          test -f instdir/program/setuprc
-          test -f android/obj/local/arm64-v8a/liblo-native-code.so
-          file android/obj/local/arm64-v8a/liblo-native-code.so
-          echo "ARM64 Collabora engine verified."
-
-      - name: Configure Collabora Android build
-        working-directory: collabora-online
-        env:
-          ANDROID_HOME: /home/runner/android-sdk
-          ANDROID_SDK_ROOT: /home/runner/android-sdk
-        run: |
-          set -eux
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-
-          ./autogen.sh
-
-          ./configure \
-            --enable-androidapp \
-            --with-lo-builddir="$GITHUB_WORKSPACE/collabora-online/engine" \
-            --enable-debug \
-            --with-android-abi=arm64-v8a \
-            --with-app-name="TayyibWord" \
-            --with-app-package-name="com.mimsadi24.tayyibword"
-
-      - name: Build Collabora Android libraries
-        working-directory: collabora-online
-        env:
-          ANDROID_HOME: /home/runner/android-sdk
-          ANDROID_SDK_ROOT: /home/runner/android-sdk
-        run: |
-          set -eux
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-          make -j2
-
-      - name: Build Android AAR/APK
-        working-directory: collabora-online/android
-        env:
-          ANDROID_HOME: /home/runner/android-sdk
-          ANDROID_SDK_ROOT: /home/runner/android-sdk
-        run: |
-          set -eux
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
-          ./gradlew :lib:assembleDebug --stacktrace
-
-      - name: Assemble TayyibWord Flutter APK
-        run: |
-          set -eux
           mkdir -p "$GITHUB_WORKSPACE/android/app/libs"
-          AAR="$(find "$GITHUB_WORKSPACE/collabora-online/android" -type f -name "*.aar" | head -n 1)"
-          test -n "$AAR"
-          cp "$AAR" "$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar"
 
+          cp \
+            "$GITHUB_WORKSPACE/.engine-cache/lib-debug.aar" \
+            "$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar"
+
+          unzip -l \
+            "$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar" \
+            | grep -E 'classes.jar|AndroidManifest.xml'
+
+      - name: Verify Flutter project root
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -eux
+
+          test -f pubspec.yaml
+          test -f android/app/build.gradle.kts
+          test -f android/app/libs/tayyibword-engine.aar
+
+          pwd
+          ls -la
+
+      - name: Flutter dependencies and analysis
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -eux
           flutter pub get
           flutter analyze
-          flutter build apk --release
 
-          test -f "$GITHUB_WORKSPACE/build/app/outputs/flutter-apk/app-release.apk"
-
-      - name: Verify build artifacts
+      - name: Build TayyibWord APK
+        working-directory: ${{ github.workspace }}
         run: |
           set -eux
-          echo "===== APK ====="
-          find "$GITHUB_WORKSPACE/collabora-online" \
-            -type f -name "*.apk" -print
 
-          echo "===== AAR ====="
-          find "$GITHUB_WORKSPACE/collabora-online" \
-            -type f -name "*.aar" -print
+          flutter build apk --release
 
-          test "$(find "$GITHUB_WORKSPACE/collabora-online" -type f -name "*.aar" | wc -l)" -gt 0
+          test -s build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Upload TayyibWord Android artifacts
+      - name: Upload TayyibWord APK
         uses: actions/upload-artifact@v4
         with:
-          name: TayyibWord-ARM64-Collabora-and-Flutter
-          path: |
-            collabora-online/**/*.apk
-            collabora-online/**/*.aar
-            build/app/outputs/flutter-apk/app-release.apk
+          name: TayyibWord-ARM64-Flutter
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
