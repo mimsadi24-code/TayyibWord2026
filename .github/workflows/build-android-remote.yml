@@ -112,6 +112,59 @@ jobs:
             "$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar" \
             | grep -E 'classes.jar|AndroidManifest.xml'
 
+      - name: Normalize Collabora AAR metadata for compileSdk 34
+        run: |
+          set -eux
+          AAR="$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar"
+          TMP="$GITHUB_WORKSPACE/.aar-patch"
+          rm -rf "$TMP"
+          mkdir -p "$TMP"
+
+          unzip -q "$AAR" -d "$TMP"
+
+          META="$TMP/META-INF/com/android/build/gradle/aar-metadata.properties"
+          test -f "$META"
+
+          echo "Original AAR metadata:"
+          cat "$META"
+
+          python3 - "$META" <<'PYMETA'
+from pathlib import Path
+import sys
+
+p = Path(sys.argv[1])
+s = p.read_text()
+
+lines = []
+found = False
+
+for line in s.splitlines():
+    if line.startswith("minCompileSdk="):
+        lines.append("minCompileSdk=34")
+        found = True
+    else:
+        lines.append(line)
+
+if not found:
+    lines.append("minCompileSdk=34")
+
+p.write_text("\n".join(lines) + "\n")
+PYMETA
+
+          echo "Normalized AAR metadata:"
+          cat "$META"
+
+          rm -f "$AAR"
+          (
+            cd "$TMP"
+            zip -q -r "$AAR" .
+          )
+
+          test -s "$AAR"
+          unzip -p "$AAR"             META-INF/com/android/build/gradle/aar-metadata.properties             | grep -q '^minCompileSdk=34$'
+
+          rm -rf "$TMP"
+
       - name: Verify Flutter project root
         working-directory: ${{ github.workspace }}
         run: |
