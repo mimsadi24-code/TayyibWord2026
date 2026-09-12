@@ -150,7 +150,7 @@ class TayyibEditorActivity : LOActivity() {
             setStroke(dp(1),Color.rgb(215,221,228))
             cornerRadius=dp(2).toFloat()
         }
-        setOnClickListener{if(i.cmd!=null)uno(i.cmd)}
+        setOnClickListener{if(i.cmd!=null)uno(i.cmd) else action(i.name)}
     }
 
     private fun I(n:String,c:String?=null)=Item(n,c)
@@ -214,5 +214,75 @@ class TayyibEditorActivity : LOActivity() {
         }
     }
 
+    private fun action(raw:String){
+        val n=raw.replace("\n"," ").trim().lowercase()
+        try{
+            when{
+                n=="paste" || n.startsWith("📋 paste") -> postMobileMessage("paste")
+                n=="cut" || n.startsWith("cut") -> uno(".uno:Cut")
+                n=="copy" || n.startsWith("copy") -> uno(".uno:Copy")
+                n.contains("save as") -> uno(".uno:SaveAs")
+                n=="save" || n.startsWith("save ") -> uno(".uno:Save")
+                n.contains("print") -> uno(".uno:Print")
+                n.contains("bold") -> uno(".uno:Bold")
+                n.contains("italic") -> uno(".uno:Italic")
+                n.contains("underline") -> uno(".uno:Underline")
+                n.contains("strike") -> uno(".uno:Strikeout")
+                n.contains("subscript") -> uno(".uno:Subscript")
+                n.contains("superscript") -> uno(".uno:Superscript")
+                n=="left" || n.startsWith("left ") -> uno(".uno:LeftPara")
+                n=="center" || n.startsWith("center ") -> uno(".uno:CenterPara")
+                n=="right" || n.startsWith("right ") -> uno(".uno:RightPara")
+                n=="justify" || n.startsWith("justify ") -> uno(".uno:JustifyPara")
+                n.contains("find") -> uno(".uno:SearchDialog")
+                n.contains("table") && !n.contains("contents") -> uno(".uno:InsertTable")
+                n.contains("picture") -> uno(".uno:InsertGraphic")
+                n.contains("hyperlink") -> uno(".uno:HyperlinkDialog")
+                n.contains("equation") -> uno(".uno:InsertFormula")
+                n.contains("zoom +") -> uno(".uno:ZoomPlus")
+                n.contains("zoom −") || n.contains("zoom -") -> uno(".uno:ZoomMinus")
+                n.contains("undo") -> uno(".uno:Undo")
+                n.contains("redo") -> uno(".uno:Redo")
+                n.contains("page break") -> uno(".uno:InsertPageBreak")
+                n.contains("new comment") -> uno(".uno:InsertAnnotation")
+                n.contains("word count") -> uno(".uno:WordCountDialog")
+                n.contains("spelling") -> uno(".uno:SpellDialog")
+                n.contains("thesaurus") -> uno(".uno:ThesaurusDialog")
+                n.contains("insert caption") -> uno(".uno:InsertCaptionDialog")
+                n.contains("bookmark") -> uno(".uno:InsertBookmark")
+                n.contains("footnote") -> uno(".uno:InsertFootnote")
+                n.contains("endnote") -> uno(".uno:InsertEndnote")
+                n.contains("page number") -> uno(".uno:InsertPageNumber")
+                n.contains("header") -> uno(".uno:InsertPageHeader")
+                n.contains("footer") -> uno(".uno:InsertPageFooter")
+                n.contains("select") -> uno(".uno:SelectAll")
+                n.contains("show/hide") -> uno(".uno:ControlCodes")
+                n.contains("ruler") -> uno(".uno:ViewRuler")
+                n.contains("gridlines") -> uno(".uno:Grid")
+                n.contains("navigation pane") -> uno(".uno:Sidebar")
+                n.contains("print layout") -> uno(".uno:PrintLayout")
+                n.contains("full screen") -> uno(".uno:FullScreen")
+                n.contains("web layout") -> uno(".uno:BrowseView")
+                n.contains("outline") -> uno(".uno:OutlineView")
+                n.contains("draft") -> uno(".uno:NormalView")
+                n.contains("columns") -> uno(".uno:FormatColumns")
+                n.contains("page color") -> uno(".uno:BackgroundColor")
+                n.contains("page borders") -> uno(".uno:BorderDialog")
+                n.contains("protect document") -> uno(".uno:Protect")
+                n.contains("track changes") -> uno(".uno:TrackChanges")
+                n.contains("accept") -> uno(".uno:AcceptTrackedChange")
+                n.contains("reject") -> uno(".uno:RejectTrackedChange")
+                n.contains("previous") -> uno(".uno:PreviousTrackedChange")
+                n.contains("next") -> uno(".uno:NextTrackedChange")
+                n.contains("macros") -> uno(".uno:MacroDialog")
+                n.contains("new window") -> uno(".uno:NewWindow")
+                n.contains("split") -> uno(".uno:SplitWindow")
+                n.contains("switch windows") -> uno(".uno:WindowList")
+                else -> {}
+            }
+        }catch(_:Exception){}
+    }
+
     private fun uno(c:String){try{postUnoCommand(c,"",false)}catch(_:Exception){}}
+
 }
