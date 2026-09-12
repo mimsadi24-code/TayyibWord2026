@@ -2,31 +2,37 @@ name: TayyibWord Android ARM64 Build
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: tayyibword-android-build
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Build TayyibWord
     runs-on: ubuntu-24.04
     timeout-minutes: 90
 
     steps:
-      - name: Checkout TayyibWord
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore stable Collabora AAR cache
-        id: aar-cache
+      - name: Restore verified Collabora AAR
+        id: aar
         uses: actions/cache/restore@v4
         with:
           path: .engine-cache
           key: tayyibword-collabora-aar-v1
 
-      - name: Bootstrap AAR from last verified Collabora build
-        if: steps.aar-cache.outputs.cache-hit != 'true'
+      - name: Bootstrap verified AAR
+        if: steps.aar.outputs.cache-hit != 'true'
         uses: actions/download-artifact@v4
         with:
           name: TayyibWord-ARM64-Collabora
@@ -35,25 +41,20 @@ jobs:
           run-id: 34672627454
           path: .bootstrap-collabora
 
-      - name: Prepare and verify Collabora AAR
-        if: steps.aar-cache.outputs.cache-hit != 'true'
+      - name: Store verified AAR in cache
+        if: steps.aar.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          set -eux
+          set -euo pipefail
           mkdir -p .engine-cache
-
-          AAR="$(find .bootstrap-collabora \
-            -type f \( -name 'lib-debug.aar' -o -name '*.aar' \) \
-            | head -n 1)"
-
+          AAR="$(find .bootstrap-collabora -type f -name '*.aar' | head -n 1)"
           test -n "$AAR"
           cp "$AAR" .engine-cache/lib-debug.aar
-
           test -s .engine-cache/lib-debug.aar
-          unzip -l .engine-cache/lib-debug.aar \
-            | grep -E 'classes.jar|AndroidManifest.xml'
+          unzip -t .engine-cache/lib-debug.aar >/dev/null
 
-      - name: Save stable Collabora AAR cache
-        if: steps.aar-cache.outputs.cache-hit != 'true'
+      - name: Save verified AAR cache
+        if: steps.aar.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: .engine-cache
@@ -65,12 +66,13 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Install Android SDK
+      - name: Install Android SDK 34
+        shell: bash
         env:
           ANDROID_HOME: /home/runner/android-sdk
           ANDROID_SDK_ROOT: /home/runner/android-sdk
         run: |
-          set -eux
+          set -euo pipefail
 
           mkdir -p "$ANDROID_HOME/cmdline-tools"
           cd "$ANDROID_HOME"
@@ -96,9 +98,10 @@ jobs:
           test -d "$ANDROID_HOME/platforms/android-34"
           test -d "$ANDROID_HOME/build-tools/34.0.0"
 
-      - name: Attach verified Collabora AAR
+      - name: Attach Collabora engine
+        shell: bash
         run: |
-          set -eux
+          set -euo pipefail
 
           test -s "$GITHUB_WORKSPACE/.engine-cache/lib-debug.aar"
 
@@ -108,15 +111,18 @@ jobs:
             "$GITHUB_WORKSPACE/.engine-cache/lib-debug.aar" \
             "$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar"
 
-          unzip -l \
+          unzip -t \
             "$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar" \
-            | grep -E 'classes.jar|AndroidManifest.xml'
+            >/dev/null
 
-      - name: Normalize Collabora AAR metadata for compileSdk 34
+      - name: Normalize AAR compile metadata
+        shell: bash
         run: |
-          set -eux
+          set -euo pipefail
+
           AAR="$GITHUB_WORKSPACE/android/app/libs/tayyibword-engine.aar"
-          TMP="$GITHUB_WORKSPACE/.aar-patch"
+          TMP="$GITHUB_WORKSPACE/.aar-normalized"
+
           rm -rf "$TMP"
           mkdir -p "$TMP"
 
@@ -125,77 +131,73 @@ jobs:
           META="$TMP/META-INF/com/android/build/gradle/aar-metadata.properties"
           test -f "$META"
 
-          echo "Original AAR metadata:"
-          cat "$META"
+          python3 -c '
+          from pathlib import Path
+          import sys
 
-          python3 - "$META" <<'PYMETA'
-from pathlib import Path
-import sys
+          p = Path(sys.argv[1])
+          lines = p.read_text().splitlines()
+          out = []
+          found = False
 
-p = Path(sys.argv[1])
-s = p.read_text()
+          for line in lines:
+              if line.startswith("minCompileSdk="):
+                  out.append("minCompileSdk=34")
+                  found = True
+              else:
+                  out.append(line)
 
-lines = []
-found = False
+          if not found:
+              out.append("minCompileSdk=34")
 
-for line in s.splitlines():
-    if line.startswith("minCompileSdk="):
-        lines.append("minCompileSdk=34")
-        found = True
-    else:
-        lines.append(line)
-
-if not found:
-    lines.append("minCompileSdk=34")
-
-p.write_text("\n".join(lines) + "\n")
-PYMETA
-
-          echo "Normalized AAR metadata:"
-          cat "$META"
+          p.write_text("\n".join(out) + "\n")
+          ' "$META"
 
           rm -f "$AAR"
+
           (
             cd "$TMP"
             zip -q -r "$AAR" .
           )
 
-          test -s "$AAR"
-          unzip -p "$AAR"             META-INF/com/android/build/gradle/aar-metadata.properties             | grep -q '^minCompileSdk=34$'
+          unzip -t "$AAR" >/dev/null
+
+          unzip -p "$AAR" \
+            META-INF/com/android/build/gradle/aar-metadata.properties \
+            | grep -qx 'minCompileSdk=34'
 
           rm -rf "$TMP"
 
-      - name: Verify Flutter project root
+      - name: Verify project
         working-directory: ${{ github.workspace }}
+        shell: bash
         run: |
-          set -eux
-
+          set -euo pipefail
           test -f pubspec.yaml
           test -f android/app/build.gradle.kts
           test -f android/app/libs/tayyibword-engine.aar
+          grep -q 'compileSdk = 34' android/app/build.gradle.kts
+          grep -q 'minSdk = 26' android/app/build.gradle.kts
 
-          pwd
-          ls -la
-
-      - name: Flutter dependencies and analysis
+      - name: Flutter dependencies
         working-directory: ${{ github.workspace }}
+        shell: bash
         run: |
-          set -eux
+          set -euo pipefail
           flutter pub get
           flutter analyze
 
-      - name: Build TayyibWord APK
+      - name: Build release APK
         working-directory: ${{ github.workspace }}
+        shell: bash
         run: |
-          set -eux
-
+          set -euo pipefail
           flutter build apk --release
-
           test -s build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Upload TayyibWord APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TayyibWord-ARM64-Flutter
+          name: TayyibWord-ARM64-Release
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
