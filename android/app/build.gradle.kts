@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.example.tayyib_word_desktop"
-    compileSdk = 34
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,7 +20,7 @@ android {
 
         applicationId = "com.example.tayyib_word_desktop"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -28,8 +28,7 @@ android {
     packaging {
         jniLibs {
             keepDebugSymbols += setOf(
-                "**/libflutter.so",
-                "**/libapp.so"
+                "**/*.so"
             )
         }
     }
