@@ -2531,602 +2531,133 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _showEquation() {
-    final equationController = TextEditingController();
-    final numeratorController = TextEditingController();
-    final denominatorController = TextEditingController();
-
-    final templates = <String>[
+    final equations = <String>[
+      'x² + y² = z²',
       'a² + b² = c²',
-      'ax² + bx + c = 0',
       'E = mc²',
       'F = ma',
-      'πr²',
+      'A = πr²',
+      'V = πr²h',
+      'x = (-b ± √(b² - 4ac)) / 2a',
+      'Σ xᵢ',
+      '∫ f(x) dx',
       '√x',
-      '∑ᵢ₌₁ⁿ i',
-      '∫ₐᵇ f(x) dx',
-      'x₁ + x₂',
-      'x² + y²',
+      'aⁿ',
+      'H₂O',
     ];
 
-    final symbols = <String>[
-      '²',
-      '³',
-      '⁰',
-      '¹',
-      '⁴',
-      '⁵',
-      '₀',
-      '₁',
-      '₂',
-      '₃',
-      '₄',
-      '₅',
-      '√',
-      '∑',
-      '∏',
-      '∫',
-      '∞',
-      'π',
-      'α',
-      'β',
-      'γ',
-      'θ',
-      'λ',
-      'μ',
-      'σ',
-      'φ',
-      'ω',
-      '±',
-      '×',
-      '÷',
-      '≠',
-      '≤',
-      '≥',
-      '≈',
-      '≡',
-      '→',
-      '←',
-      '↔',
-      '∂',
-      '∆',
-      '∇',
-    ];
-
-    void insertAtCursor(String value) {
-      final text = equationController.text;
-      final selection = equationController.selection;
-
-      final startPos = selection.start < 0 ? text.length : selection.start;
-      final endPos = selection.end < 0 ? text.length : selection.end;
-
-      final updated = text.replaceRange(startPos, endPos, value);
-
-      equationController.value = TextEditingValue(
-        text: updated,
-        selection: TextSelection.collapsed(offset: startPos + value.length),
-      );
-    }
-
-    Widget fractionPreview() {
-      final numerator = numeratorController.text.trim();
-      final denominator = denominatorController.text.trim();
-
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          border: Border.all(color: Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              numerator.isEmpty ? 'লব' : numerator,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
-            ),
-            Container(
-              width: 100,
-              height: 2,
-              color: Colors.black87,
-              margin: const EdgeInsets.symmetric(vertical: 5),
-            ),
-            Text(
-              denominator.isEmpty ? 'হর' : denominator,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-      );
-    }
-
-    showDialog<void>(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.functions),
-                  SizedBox(width: 8),
-                  Text('Equation'),
-                ],
-              ),
-              content: SizedBox(
-                width: 700,
-                height: 570,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Fraction — লব ও হর',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: numeratorController,
-                            decoration: const InputDecoration(
-                              labelText: 'লব (উপরের অংশ)',
-                              hintText: 'যেমন: a + b',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (_) {
-                              setDialogState(() {});
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 14),
-                          child: Text(
-                            '/',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: denominatorController,
-                            decoration: const InputDecoration(
-                              labelText: 'হর (নিচের অংশ)',
-                              hintText: 'যেমন: c + d',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (_) {
-                              setDialogState(() {});
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    const Text(
-                      'Fraction Preview',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-
-                    Center(child: fractionPreview()),
-
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            final n = numeratorController.text.trim();
-                            final d = denominatorController.text.trim();
-
-                            if (n.isEmpty || d.isEmpty) {
-                              _showMessage('লব এবং হর দুটোই পূরণ করুন।');
-                              return;
-                            }
-
-                            equationController.text = '($n)/($d)';
-
-                            equationController.selection =
-                                TextSelection.collapsed(
-                                  offset: equationController.text.length,
-                                );
-
-                            setDialogState(() {});
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Fraction তৈরি'),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () {
-                            numeratorController.clear();
-                            denominatorController.clear();
-                            setDialogState(() {});
-                          },
-                          child: const Text('Clear'),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    const Text(
-                      'Equation Templates',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-
-                    SizedBox(
-                      height: 70,
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          spacing: 5,
-                          runSpacing: 5,
-                          children: templates.map((item) {
-                            return OutlinedButton(
-                              onPressed: () {
-                                equationController.text = item;
-                                equationController.selection =
-                                    TextSelection.collapsed(
-                                      offset: item.length,
-                                    );
-                                setDialogState(() {});
-                              },
-                              child: Text(item),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    const Text(
-                      'Math Symbols',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 5),
-
-                    Expanded(
-                      child: GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 9,
-                              crossAxisSpacing: 5,
-                              mainAxisSpacing: 5,
-                            ),
-                        itemCount: symbols.length,
-                        itemBuilder: (context, index) {
-                          final symbol = symbols[index];
-
-                          return InkWell(
-                            onTap: () {
-                              insertAtCursor(symbol);
-                              setDialogState(() {});
-                            },
-                            child: Container(
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade400),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Text(
-                                symbol,
-                                style: const TextStyle(fontSize: 19),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Insert Equation',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                  },
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final fractionN = numeratorController.text.trim();
-                    final fractionD = denominatorController.text.trim();
-
-                    String value = equationController.text.trim();
-
-                    if (fractionN.isNotEmpty && fractionD.isNotEmpty) {
-                      value = 'Fraction: $fractionN / $fractionD';
-                    }
-
-                    if (value.isEmpty) {
-                      _showMessage('একটি Equation অথবা Fraction দিন।');
-                      return;
-                    }
-
-                    _insertText(
-                      '\n'
-                      '[Equation]\n'
-                      '$value\n'
-                      '[/Equation]\n',
-                    );
-
-                    Navigator.pop(dialogContext);
+              ...equations.map(
+                (equation) => ListTile(
+                  leading: const Icon(Icons.functions),
+                  title: Text(equation, style: const TextStyle(fontSize: 17)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _insertText('\n$equation\n\n');
                     _showMessage('Equation inserted');
                   },
-                  icon: const Icon(Icons.functions),
-                  label: const Text('Insert Equation'),
                 ),
-              ],
-            );
-          },
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
   void _showSymbolPicker() {
-    final searchController = TextEditingController();
+    final symbols = <String>[
+      '©',
+      '®',
+      '™',
+      '€',
+      '£',
+      '¥',
+      '₹',
+      '±',
+      '×',
+      '÷',
+      '≤',
+      '≥',
+      '≠',
+      '∞',
+      '√',
+      'π',
+      'α',
+      'β',
+      'γ',
+      'Δ',
+      'Ω',
+      '→',
+      '←',
+      '↑',
+      '↓',
+      '★',
+      '☆',
+      '✓',
+      '✕',
+      '♥',
+      '♦',
+      '♣',
+      '♠',
+    ];
 
-    final categories = <String, List<String>>{
-      'Common': ['©', '®', '™', '§', '¶', '†', '‡', '•', '…', '°', '№'],
-      'Math': [
-        '±',
-        '×',
-        '÷',
-        '=',
-        '≠',
-        '<',
-        '>',
-        '≤',
-        '≥',
-        '≈',
-        '≡',
-        '∞',
-        '√',
-        '∑',
-        '∏',
-        '∫',
-        '∂',
-        '∆',
-        '∇',
-        '∝',
-        '∴',
-      ],
-      'Greek': [
-        'α',
-        'β',
-        'γ',
-        'δ',
-        'ε',
-        'ζ',
-        'η',
-        'θ',
-        'ι',
-        'κ',
-        'λ',
-        'μ',
-        'ν',
-        'ξ',
-        'π',
-        'ρ',
-        'σ',
-        'τ',
-        'φ',
-        'χ',
-        'ψ',
-        'ω',
-        'Α',
-        'Β',
-        'Γ',
-        'Δ',
-        'Θ',
-        'Λ',
-        'Ξ',
-        'Π',
-        'Σ',
-        'Φ',
-        'Ψ',
-        'Ω',
-      ],
-      'Arrows': [
-        '←',
-        '→',
-        '↑',
-        '↓',
-        '↔',
-        '↕',
-        '↖',
-        '↗',
-        '↘',
-        '↙',
-        '⇒',
-        '⇐',
-        '⇑',
-        '⇓',
-        '⇔',
-        '➜',
-        '➝',
-        '➞',
-      ],
-      'Currency': ['\$', '€', '£', '¥', '₹', '৳', '₽', '₩', '₺', '₴'],
-      'Fractions': [
-        '½',
-        '⅓',
-        '⅔',
-        '¼',
-        '¾',
-        '⅕',
-        '⅖',
-        '⅗',
-        '⅘',
-        '⅙',
-        '⅚',
-        '⅛',
-        '⅜',
-        '⅝',
-        '⅞',
-      ],
-      'Shapes': [
-        '○',
-        '●',
-        '□',
-        '■',
-        '△',
-        '▲',
-        '◇',
-        '◆',
-        '☆',
-        '★',
-        '♠',
-        '♣',
-        '♥',
-        '♦',
-      ],
-      'Punctuation': ['“', '”', '‘', '’', '«', '»', '–', '—', '-', '¿', '¡'],
-    };
-
-    String selectedCategory = 'Common';
-
-    showDialog<void>(
+    showDialog(
       context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final query = searchController.text.trim().toLowerCase();
-
-            final allSymbols = categories[selectedCategory] ?? [];
-
-            final symbols = query.isEmpty
-                ? allSymbols
-                : allSymbols
-                      .where((symbol) => symbol.toLowerCase().contains(query))
-                      .toList();
-
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.text_fields),
-                  SizedBox(width: 8),
-                  Text('Symbol'),
-                ],
+        return AlertDialog(
+          title: const Text('Symbol'),
+          content: SizedBox(
+            width: 340,
+            child: GridView.builder(
+              shrinkWrap: true,
+              itemCount: symbols.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
               ),
-              content: SizedBox(
-                width: 700,
-                height: 520,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: searchController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        labelText: 'Search symbols',
-                        hintText: 'Search or choose a category',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) {
-                        setDialogState(() {});
-                      },
-                    ),
-                    const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final symbol = symbols[index];
 
-                    SizedBox(
-                      height: 42,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: categories.keys.map((category) {
-                            final selected = category == selectedCategory;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: Text(category),
-                                selected: selected,
-                                onSelected: (_) {
-                                  setDialogState(() {
-                                    selectedCategory = category;
-                                    searchController.clear();
-                                  });
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Expanded(
-                      child: symbols.isEmpty
-                          ? const Center(child: Text('No symbols found.'))
-                          : GridView.builder(
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 9,
-                                    crossAxisSpacing: 7,
-                                    mainAxisSpacing: 7,
-                                    childAspectRatio: 1.15,
-                                  ),
-                              itemCount: symbols.length,
-                              itemBuilder: (context, index) {
-                                final symbol = symbols[index];
-
-                                return Tooltip(
-                                  message: 'Insert $symbol',
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(6),
-                                    onTap: () {
-                                      _insertText(symbol);
-                                      Navigator.pop(dialogContext);
-                                      _showMessage('Symbol inserted: $symbol');
-                                    },
-                                    child: Container(
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey.shade400,
-                                        ),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        symbol,
-                                        style: const TextStyle(fontSize: 24),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    searchController.dispose();
+                return InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () {
                     Navigator.pop(dialogContext);
+                    _insertText(symbol);
+                    _showMessage('Symbol inserted: $symbol');
                   },
-                  child: const Text('Close'),
-                ),
-              ],
-            );
-          },
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFD0D0D0)),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(symbol, style: const TextStyle(fontSize: 21)),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
         );
       },
     );

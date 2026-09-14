@@ -1,0 +1,1295 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+void main() {
+  runApp(const TayyibWordApp());
+}
+
+class TayyibWordApp extends StatelessWidget {
+  const TayyibWordApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Tayyib Word',
+      theme: ThemeData(
+        useMaterial3: false,
+        fontFamily: 'Arial',
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF185ABD)),
+      ),
+      home: const WordEditorScreen(),
+    );
+  }
+}
+
+class WordEditorScreen extends StatefulWidget {
+  const WordEditorScreen({super.key});
+
+  @override
+  State<WordEditorScreen> createState() => _WordEditorScreenState();
+}
+
+class _WordEditorScreenState extends State<WordEditorScreen> {
+  final TextEditingController _controller = TextEditingController();
+
+  String _currentFileName = 'Document1.txt';
+  String _activeTab = 'Home';
+
+  bool _isBold = false;
+  bool _isItalic = false;
+  bool _isUnderline = false;
+
+  double _fontSize = 11;
+  String _fontName = 'Calibri';
+
+  int _wordCount = 0;
+
+  final List<String> _tabs = const [
+    'Home',
+    'Insert',
+    'Page Layout',
+    'References',
+    'Mailings',
+    'Review',
+    'View',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller.text =
+        'Welcome to Tayyib Word\n\n'
+        'This is your document. Start typing here...';
+
+    _controller.addListener(_updateWordCount);
+    _updateWordCount();
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_updateWordCount);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _updateWordCount() {
+    final text = _controller.text.trim();
+
+    final count = text.isEmpty
+        ? 0
+        : text.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).length;
+
+    if (mounted) {
+      setState(() {
+        _wordCount = count;
+      });
+    }
+  }
+
+  void _newDocument() {
+    setState(() {
+      _controller.clear();
+      _currentFileName = 'Document1.txt';
+    });
+  }
+
+  Future<void> _openFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['txt', 'html'],
+      );
+
+      if (result == null || result.files.single.path == null) return;
+
+      final path = result.files.single.path!;
+      final file = File(path);
+      final contents = await file.readAsString();
+
+      setState(() {
+        _controller.text = contents;
+        _currentFileName = result.files.single.name;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Opened: ${result.files.single.name}')),
+        );
+      }
+    } catch (e) {
+      _showMessage('Could not open file: $e');
+    }
+  }
+
+  Future<void> _saveFile() async {
+    try {
+      Directory directory;
+
+      if (Platform.isAndroid) {
+        directory =
+            await getExternalStorageDirectory() ??
+            await getApplicationDocumentsDirectory();
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      final safeName = _currentFileName.toLowerCase().endsWith('.txt')
+          ? _currentFileName
+          : '$_currentFileName.txt';
+
+      final path = '${directory.path}/$safeName';
+
+      final file = File(path);
+      await file.writeAsString(_controller.text);
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Saved: $safeName')));
+      }
+
+      await Share.shareXFiles([XFile(path)], text: 'Tayyib Word Document');
+    } catch (e) {
+      _showMessage('Could not save file: $e');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _cutText() {
+    final selection = _controller.selection;
+
+    if (!selection.isValid || selection.isCollapsed) {
+      _showMessage('Select some text first.');
+      return;
+    }
+
+    final selectedText = _controller.text.substring(
+      selection.start,
+      selection.end,
+    );
+
+    Clipboard.setData(ClipboardData(text: selectedText));
+
+    final newText = _controller.text.replaceRange(
+      selection.start,
+      selection.end,
+      '',
+    );
+
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: selection.start),
+    );
+  }
+
+  Future<void> _copyText() async {
+    final selection = _controller.selection;
+
+    if (!selection.isValid || selection.isCollapsed) {
+      _showMessage('Select some text first.');
+      return;
+    }
+
+    final selectedText = _controller.text.substring(
+      selection.start,
+      selection.end,
+    );
+
+    await Clipboard.setData(ClipboardData(text: selectedText));
+    _showMessage('Copied');
+  }
+
+  Future<void> _pasteText() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+
+    if (data == null || data.text == null) {
+      _showMessage('Clipboard is empty.');
+      return;
+    }
+
+    final selection = _controller.selection;
+    final start = selection.isValid ? selection.start : _controller.text.length;
+    final end = selection.isValid ? selection.end : start;
+
+    final newText = _controller.text.replaceRange(start, end, data.text!);
+
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + data.text!.length),
+    );
+  }
+
+  void _selectAll() {
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
+  void _undo() {
+    _showMessage('Undo is available from the editor history.');
+  }
+
+  void _redo() {
+    _showMessage('Redo is available from the editor history.');
+  }
+
+  void _toggleBold() {
+    setState(() {
+      _isBold = !_isBold;
+    });
+  }
+
+  void _toggleItalic() {
+    setState(() {
+      _isItalic = !_isItalic;
+    });
+  }
+
+  void _toggleUnderline() {
+    setState(() {
+      _isUnderline = !_isUnderline;
+    });
+  }
+
+  void _changeFontSize(double value) {
+    setState(() {
+      _fontSize = value;
+    });
+  }
+
+  void _findText() {
+    final findController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Find'),
+          content: TextField(
+            controller: findController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Find what',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final query = findController.text;
+
+                if (query.isEmpty) return;
+
+                final index = _controller.text.toLowerCase().indexOf(
+                  query.toLowerCase(),
+                );
+
+                if (index >= 0) {
+                  _controller.selection = TextSelection(
+                    baseOffset: index,
+                    extentOffset: index + query.length,
+                  );
+
+                  Navigator.pop(context);
+                } else {
+                  _showMessage('Text not found.');
+                }
+              },
+              child: const Text('Find'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _replaceText() {
+    final findController = TextEditingController();
+    final replaceController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Replace'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: findController,
+                decoration: const InputDecoration(
+                  labelText: 'Find what',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: replaceController,
+                decoration: const InputDecoration(
+                  labelText: 'Replace with',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final find = findController.text;
+
+                if (find.isEmpty) return;
+
+                final replacement = replaceController.text;
+
+                setState(() {
+                  _controller.text = _controller.text.replaceAll(
+                    find,
+                    replacement,
+                  );
+                });
+
+                Navigator.pop(context);
+              },
+              child: const Text('Replace All'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _insertText(String value) {
+    final selection = _controller.selection;
+
+    final start = selection.isValid ? selection.start : _controller.text.length;
+    final end = selection.isValid ? selection.end : start;
+
+    final newText = _controller.text.replaceRange(start, end, value);
+
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + value.length),
+    );
+  }
+
+  void _insertTable() {
+    _insertText(
+      '\n| Column 1 | Column 2 | Column 3 |\n'
+      '|----------|----------|----------|\n'
+      '|          |          |          |\n'
+      '|          |          |          |\n\n',
+    );
+
+    _showMessage('Table inserted');
+  }
+
+  void _insertPicture() {
+    _showMessage('Picture insertion is ready for file selection.');
+  }
+
+  void _insertPageBreak() {
+    _insertText('\n\n---------------- PAGE BREAK ----------------\n\n');
+  }
+
+  void _changeAlignment(TextAlign alignment) {
+    _showMessage('Alignment selected: ${alignment.name}');
+  }
+
+  Widget _buildRibbon() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF3F3F3),
+        border: Border(bottom: BorderSide(color: Color(0xFFC8C8C8))),
+      ),
+      child: Column(children: [_buildTabs(), _buildRibbonContent()]),
+    );
+  }
+
+  Widget _buildTabs() {
+    return Container(
+      height: 35,
+      color: const Color(0xFFEDEDED),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 35,
+            color: const Color(0xFF217346),
+            alignment: Alignment.center,
+            child: const Text(
+              'TW',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          ..._tabs.map(
+            (tab) => InkWell(
+              onTap: () {
+                setState(() {
+                  _activeTab = tab;
+                });
+              },
+              child: Container(
+                height: 35,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: _activeTab == tab ? Colors.white : Colors.transparent,
+                  border: _activeTab == tab
+                      ? const Border(
+                          top: BorderSide(color: Color(0xFF217346), width: 2),
+                        )
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  tab,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _activeTab == tab
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRibbonContent() {
+    switch (_activeTab) {
+      case 'Insert':
+        return _buildInsertRibbon();
+      case 'Page Layout':
+        return _buildPageLayoutRibbon();
+      case 'References':
+        return _buildReferencesRibbon();
+      case 'Mailings':
+        return _buildMailingsRibbon();
+      case 'Review':
+        return _buildReviewRibbon();
+      case 'View':
+        return _buildViewRibbon();
+      case 'Home':
+      default:
+        return _buildHomeRibbon();
+    }
+  }
+
+  Widget _buildHomeRibbon() {
+    return SizedBox(
+      height: 108,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildRibbonGroup('Clipboard', [
+              _bigRibbonButton(Icons.content_cut, 'Cut', _cutText),
+              _bigRibbonButton(Icons.copy, 'Copy', _copyText),
+              _bigRibbonButton(Icons.paste, 'Paste', _pasteText),
+              _bigRibbonButton(Icons.select_all, 'Select All', _selectAll),
+            ]),
+            _buildRibbonGroup('Font', [
+              _fontControls(),
+              Row(
+                children: [
+                  _smallRibbonButton(
+                    Icons.format_bold,
+                    'Bold',
+                    _toggleBold,
+                    active: _isBold,
+                  ),
+                  _smallRibbonButton(
+                    Icons.format_italic,
+                    'Italic',
+                    _toggleItalic,
+                    active: _isItalic,
+                  ),
+                  _smallRibbonButton(
+                    Icons.format_underlined,
+                    'Underline',
+                    _toggleUnderline,
+                    active: _isUnderline,
+                  ),
+                ],
+              ),
+            ]),
+            _buildRibbonGroup('Paragraph', [
+              Row(
+                children: [
+                  _smallRibbonButton(
+                    Icons.format_align_left,
+                    'Left',
+                    () => _changeAlignment(TextAlign.left),
+                  ),
+                  _smallRibbonButton(
+                    Icons.format_align_center,
+                    'Center',
+                    () => _changeAlignment(TextAlign.center),
+                  ),
+                  _smallRibbonButton(
+                    Icons.format_align_right,
+                    'Right',
+                    () => _changeAlignment(TextAlign.right),
+                  ),
+                  _smallRibbonButton(
+                    Icons.format_align_justify,
+                    'Justify',
+                    () => _changeAlignment(TextAlign.justify),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  _smallRibbonButton(
+                    Icons.format_list_bulleted,
+                    'Bullets',
+                    () => _insertText('\n• '),
+                  ),
+                  _smallRibbonButton(
+                    Icons.format_list_numbered,
+                    'Numbering',
+                    () => _insertText('\n1. '),
+                  ),
+                  _smallRibbonButton(
+                    Icons.format_indent_increase,
+                    'Increase',
+                    () => _insertText('    '),
+                  ),
+                ],
+              ),
+            ]),
+            _buildRibbonGroup('Editing', [
+              _bigRibbonButton(Icons.search, 'Find', _findText),
+              _bigRibbonButton(Icons.find_replace, 'Replace', _replaceText),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInsertRibbon() {
+    return SizedBox(
+      height: 108,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildRibbonGroup('Pages', [
+              _bigRibbonButton(
+                Icons.insert_page_break,
+                'Page Break',
+                _insertPageBreak,
+              ),
+            ]),
+            _buildRibbonGroup('Tables', [
+              _bigRibbonButton(Icons.table_chart, 'Table', _insertTable),
+            ]),
+            _buildRibbonGroup('Illustrations', [
+              _bigRibbonButton(Icons.image, 'Picture', _insertPicture),
+              _bigRibbonButton(
+                Icons.crop_square,
+                'Shapes',
+                () => _showMessage('Shapes'),
+              ),
+              _bigRibbonButton(
+                Icons.bar_chart,
+                'Chart',
+                () => _showMessage('Chart'),
+              ),
+            ]),
+            _buildRibbonGroup('Text', [
+              _bigRibbonButton(
+                Icons.text_fields,
+                'Text Box',
+                () => _insertText('\n[ Text Box ]\n'),
+              ),
+              _bigRibbonButton(
+                Icons.title,
+                'WordArt',
+                () => _insertText('\nWORDART\n'),
+              ),
+            ]),
+            _buildRibbonGroup('Symbols', [
+              _bigRibbonButton(
+                Icons.functions,
+                'Equation',
+                () => _insertText('\nEquation: x² + y² = z²\n'),
+              ),
+              _bigRibbonButton(
+                Icons.emoji_symbols,
+                'Symbol',
+                () => _insertText(' © ™ ® '),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPageLayoutRibbon() {
+    return SizedBox(
+      height: 108,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildRibbonGroup('Themes', [
+              _bigRibbonButton(
+                Icons.palette,
+                'Themes',
+                () => _showMessage('Themes'),
+              ),
+              _bigRibbonButton(
+                Icons.text_fields,
+                'Fonts',
+                () => _showMessage('Theme Fonts'),
+              ),
+            ]),
+            _buildRibbonGroup('Page Setup', [
+              _bigRibbonButton(
+                Icons.margin,
+                'Margins',
+                () => _showMessage('Margins'),
+              ),
+              _bigRibbonButton(
+                Icons.screen_lock_rotation,
+                'Orientation',
+                () => _showMessage('Orientation'),
+              ),
+              _bigRibbonButton(
+                Icons.description,
+                'Size',
+                () => _showMessage('A4'),
+              ),
+              _bigRibbonButton(
+                Icons.view_column,
+                'Columns',
+                () => _showMessage('Columns'),
+              ),
+            ]),
+            _buildRibbonGroup('Page Background', [
+              _bigRibbonButton(
+                Icons.water_drop,
+                'Watermark',
+                () => _showMessage('Watermark'),
+              ),
+              _bigRibbonButton(
+                Icons.format_color_fill,
+                'Page Color',
+                () => _showMessage('Page Color'),
+              ),
+              _bigRibbonButton(
+                Icons.border_outer,
+                'Page Borders',
+                () => _showMessage('Page Borders'),
+              ),
+            ]),
+            _buildRibbonGroup('Paragraph', [
+              _bigRibbonButton(
+                Icons.keyboard_arrow_right,
+                'Indent',
+                () => _insertText('    '),
+              ),
+              _bigRibbonButton(
+                Icons.format_line_spacing,
+                'Spacing',
+                () => _showMessage('Line Spacing'),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReferencesRibbon() {
+    return SizedBox(
+      height: 108,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildRibbonGroup('Table of Contents', [
+              _bigRibbonButton(
+                Icons.list,
+                'TOC',
+                () => _showMessage('Table of Contents'),
+              ),
+            ]),
+            _buildRibbonGroup('Footnotes', [
+              _bigRibbonButton(
+                Icons.note_add,
+                'Insert Footnote',
+                () => _insertText('[1] '),
+              ),
+              _bigRibbonButton(
+                Icons.notes,
+                'Next Footnote',
+                () => _showMessage('Next Footnote'),
+              ),
+            ]),
+            _buildRibbonGroup('Citations & Bibliography', [
+              _bigRibbonButton(
+                Icons.library_books,
+                'Citation',
+                () => _showMessage('Citation'),
+              ),
+              _bigRibbonButton(
+                Icons.menu_book,
+                'Bibliography',
+                () => _showMessage('Bibliography'),
+              ),
+            ]),
+            _buildRibbonGroup('Captions', [
+              _bigRibbonButton(
+                Icons.label,
+                'Insert Caption',
+                () => _insertText('\nFigure 1: '),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMailingsRibbon() {
+    return SizedBox(
+      height: 108,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildRibbonGroup('Create', [
+              _bigRibbonButton(
+                Icons.mail,
+                'Envelopes',
+                () => _showMessage('Envelopes'),
+              ),
+              _bigRibbonButton(
+                Icons.local_post_office,
+                'Labels',
+                () => _showMessage('Labels'),
+              ),
+            ]),
+            _buildRibbonGroup('Start Mail Merge', [
+              _bigRibbonButton(
+                Icons.merge_type,
+                'Mail Merge',
+                () => _showMessage('Mail Merge'),
+              ),
+              _bigRibbonButton(
+                Icons.contacts,
+                'Recipients',
+                () => _showMessage('Select Recipients'),
+              ),
+            ]),
+            _buildRibbonGroup('Write & Insert Fields', [
+              _bigRibbonButton(
+                Icons.person_add,
+                'Address Block',
+                () => _insertText('\n«AddressBlock»\n'),
+              ),
+              _bigRibbonButton(
+                Icons.text_snippet,
+                'Greeting',
+                () => _insertText('\n«GreetingLine»\n'),
+              ),
+            ]),
+            _buildRibbonGroup('Finish', [
+              _bigRibbonButton(
+                Icons.done_all,
+                'Finish Merge',
+                () => _showMessage('Finish & Merge'),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewRibbon() {
+    return SizedBox(
+      height: 108,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildRibbonGroup('Proofing', [
+              _bigRibbonButton(
+                Icons.spellcheck,
+                'Spelling',
+                () => _showMessage('Spelling & Grammar'),
+              ),
+              _bigRibbonButton(
+                Icons.menu_book,
+                'Thesaurus',
+                () => _showMessage('Thesaurus'),
+              ),
+            ]),
+            _buildRibbonGroup('Comments', [
+              _bigRibbonButton(
+                Icons.comment,
+                'New Comment',
+                () => _insertText('\n[Comment] '),
+              ),
+              _bigRibbonButton(
+                Icons.delete,
+                'Delete',
+                () => _showMessage('Delete Comment'),
+              ),
+            ]),
+            _buildRibbonGroup('Tracking', [
+              _bigRibbonButton(
+                Icons.track_changes,
+                'Track Changes',
+                () => _showMessage('Track Changes'),
+              ),
+            ]),
+            _buildRibbonGroup('Changes', [
+              _bigRibbonButton(
+                Icons.check,
+                'Accept',
+                () => _showMessage('Accept Change'),
+              ),
+              _bigRibbonButton(
+                Icons.close,
+                'Reject',
+                () => _showMessage('Reject Change'),
+              ),
+            ]),
+            _buildRibbonGroup('Protect', [
+              _bigRibbonButton(
+                Icons.lock,
+                'Protect',
+                () => _showMessage('Protect Document'),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewRibbon() {
+    return SizedBox(
+      height: 108,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildRibbonGroup('Views', [
+              _bigRibbonButton(
+                Icons.description,
+                'Print Layout',
+                () => _showMessage('Print Layout'),
+              ),
+              _bigRibbonButton(
+                Icons.web,
+                'Web Layout',
+                () => _showMessage('Web Layout'),
+              ),
+            ]),
+            _buildRibbonGroup('Show/Hide', [
+              _bigRibbonButton(
+                Icons.straighten,
+                'Ruler',
+                () => _showMessage('Ruler'),
+              ),
+              _bigRibbonButton(
+                Icons.grid_on,
+                'Gridlines',
+                () => _showMessage('Gridlines'),
+              ),
+            ]),
+            _buildRibbonGroup('Zoom', [
+              _bigRibbonButton(
+                Icons.zoom_in,
+                'Zoom In',
+                () => setState(() {
+                  _fontSize += 1;
+                }),
+              ),
+              _bigRibbonButton(
+                Icons.zoom_out,
+                'Zoom Out',
+                () => setState(() {
+                  if (_fontSize > 6) _fontSize -= 1;
+                }),
+              ),
+              _bigRibbonButton(
+                Icons.fit_screen,
+                '100%',
+                () => setState(() {
+                  _fontSize = 11;
+                }),
+              ),
+            ]),
+            _buildRibbonGroup('Window', [
+              _bigRibbonButton(
+                Icons.open_in_new,
+                'New Window',
+                () => _showMessage('New Window'),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fontControls() {
+    return Row(
+      children: [
+        Container(
+          width: 105,
+          height: 30,
+          margin: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey.shade500),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _fontName,
+              isExpanded: true,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              items: const [
+                DropdownMenuItem(value: 'Calibri', child: Text('Calibri')),
+                DropdownMenuItem(value: 'Arial', child: Text('Arial')),
+                DropdownMenuItem(
+                  value: 'Times New Roman',
+                  child: Text('Times New Roman'),
+                ),
+                DropdownMenuItem(
+                  value: 'Courier New',
+                  child: Text('Courier New'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+
+                setState(() {
+                  _fontName = value;
+                });
+              },
+            ),
+          ),
+        ),
+        Container(
+          width: 48,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey.shade500),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<double>(
+              value: _fontSize,
+              isExpanded: true,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              items: [
+                for (final size in [
+                  8.0,
+                  9.0,
+                  10.0,
+                  11.0,
+                  12.0,
+                  14.0,
+                  16.0,
+                  18.0,
+                  20.0,
+                  24.0,
+                  28.0,
+                  36.0,
+                ])
+                  DropdownMenuItem(
+                    value: size,
+                    child: Text(size.toStringAsFixed(0)),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  _changeFontSize(value);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRibbonGroup(String label, List<Widget> children) {
+    return Container(
+      height: 108,
+      padding: const EdgeInsets.fromLTRB(7, 5, 7, 0),
+      decoration: const BoxDecoration(
+        border: Border(right: BorderSide(color: Color(0xFFD0D0D0))),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: children,
+            ),
+          ),
+          SizedBox(
+            height: 22,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 10, color: Color(0xFF444444)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bigRibbonButton(IconData icon, String label, VoidCallback onPressed) {
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(3),
+        child: Container(
+          width: 58,
+          height: 82,
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 27, color: const Color(0xFF333333)),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _smallRibbonButton(
+    IconData icon,
+    String label,
+    VoidCallback onPressed, {
+    bool active = false,
+  }) {
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: onPressed,
+        child: Container(
+          width: 38,
+          height: 36,
+          margin: const EdgeInsets.only(right: 2),
+          decoration: BoxDecoration(
+            color: active ? const Color(0xFFD9EAF7) : Colors.transparent,
+            border: active ? Border.all(color: const Color(0xFF7AA7D1)) : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: const Color(0xFF333333)),
+              Text(label, style: const TextStyle(fontSize: 7)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditor() {
+    return Container(
+      color: const Color(0xFFD9D9D9),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 850, minHeight: 1050),
+            padding: const EdgeInsets.fromLTRB(82, 70, 82, 70),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(.18),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _controller,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              textAlignVertical: TextAlignVertical.top,
+              style: TextStyle(
+                fontFamily: _fontName,
+                fontSize: _fontSize,
+                fontWeight: _isBold ? FontWeight.bold : FontWeight.normal,
+                fontStyle: _isItalic ? FontStyle.italic : FontStyle.normal,
+                decoration: _isUnderline
+                    ? TextDecoration.underline
+                    : TextDecoration.none,
+                height: 1.35,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isCollapsed: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBar() {
+    return Container(
+      height: 25,
+      color: const Color(0xFF217346),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        children: [
+          Text(
+            'Page 1',
+            style: const TextStyle(color: Colors.white, fontSize: 11),
+          ),
+          const SizedBox(width: 18),
+          Text(
+            '$_wordCount words',
+            style: const TextStyle(color: Colors.white, fontSize: 11),
+          ),
+          const Spacer(),
+          const Text(
+            'English (United States)',
+            style: TextStyle(color: Colors.white, fontSize: 10),
+          ),
+          const SizedBox(width: 18),
+          const Text(
+            '100%',
+            style: TextStyle(color: Colors.white, fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTitleBar() {
+    return Container(
+      height: 42,
+      color: const Color(0xFF185C37),
+      child: Row(
+        children: [
+          const SizedBox(width: 10),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: const Color(0xFF107C41),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              'W',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$_currentFileName - Tayyib Word',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+          IconButton(
+            tooltip: 'New',
+            onPressed: _newDocument,
+            icon: const Icon(Icons.note_add, color: Colors.white, size: 19),
+          ),
+          IconButton(
+            tooltip: 'Open',
+            onPressed: _openFile,
+            icon: const Icon(Icons.folder_open, color: Colors.white, size: 19),
+          ),
+          IconButton(
+            tooltip: 'Save',
+            onPressed: _saveFile,
+            icon: const Icon(Icons.save, color: Colors.white, size: 19),
+          ),
+          IconButton(
+            tooltip: 'Undo',
+            onPressed: _undo,
+            icon: const Icon(Icons.undo, color: Colors.white, size: 19),
+          ),
+          IconButton(
+            tooltip: 'Redo',
+            onPressed: _redo,
+            icon: const Icon(Icons.redo, color: Colors.white, size: 19),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFD9D9D9),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTitleBar(),
+            _buildRibbon(),
+            Expanded(child: _buildEditor()),
+            _buildStatusBar(),
+          ],
+        ),
+      ),
+    );
+  }
+}

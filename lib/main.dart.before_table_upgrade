@@ -725,585 +725,85 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _insertTable() {
-    var rows = 3;
-    var columns = 3;
-    var headerRow = true;
-    var borderStyle = 'Full';
-    final cells = <List<TextEditingController>>[];
+    final rowsController = TextEditingController(text: '3');
+    final columnsController = TextEditingController(text: '3');
 
-    void rebuildCells() {
-      while (cells.length < rows) {
-        cells.add([]);
-      }
-      while (cells.length > rows) {
-        for (final controller in cells.removeLast()) {
-          controller.dispose();
-        }
-      }
-
-      for (var r = 0; r < rows; r++) {
-        while (cells[r].length < columns) {
-          cells[r].add(TextEditingController());
-        }
-        while (cells[r].length > columns) {
-          cells[r].removeLast().dispose();
-        }
-      }
-    }
-
-    rebuildCells();
-
-    showDialog<void>(
+    showDialog(
       context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            rebuildCells();
-
-            return AlertDialog(
-              title: const Text('Table Editor'),
-              content: SizedBox(
-                width: 700,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Rows: $rows   Columns: $columns',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Add Row',
-                            onPressed: () {
-                              setDialogState(() {
-                                rows = (rows + 1).clamp(1, 20);
-                              });
-                            },
-                            icon: const Icon(Icons.add_box),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete Row',
-                            onPressed: rows <= 1
-                                ? null
-                                : () {
-                                    setDialogState(() {
-                                      rows--;
-                                    });
-                                  },
-                            icon: const Icon(Icons.remove_circle),
-                          ),
-                          IconButton(
-                            tooltip: 'Add Column',
-                            onPressed: () {
-                              setDialogState(() {
-                                columns = (columns + 1).clamp(1, 10);
-                              });
-                            },
-                            icon: const Icon(Icons.view_column),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete Column',
-                            onPressed: columns <= 1
-                                ? null
-                                : () {
-                                    setDialogState(() {
-                                      columns--;
-                                    });
-                                  },
-                            icon: const Icon(Icons.view_column_outlined),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                final result = await showDialog<List<int>?>(
-                                  context: context,
-                                  builder: (rangeContext) {
-                                    final r1 = TextEditingController(text: '1');
-                                    final c1 = TextEditingController(text: '1');
-                                    final r2 = TextEditingController(text: '1');
-                                    final c2 = TextEditingController(text: '2');
-
-                                    return AlertDialog(
-                                      title: const Text('Merge Cells'),
-                                      content: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Text(
-                                            'Enter the rectangular range to merge.',
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: TextField(
-                                                  controller: r1,
-                                                  keyboardType:
-                                                      TextInputType.number,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText: 'Start row',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                      ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: TextField(
-                                                  controller: c1,
-                                                  keyboardType:
-                                                      TextInputType.number,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText:
-                                                            'Start column',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                      ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: TextField(
-                                                  controller: r2,
-                                                  keyboardType:
-                                                      TextInputType.number,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText: 'End row',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                      ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: TextField(
-                                                  controller: c2,
-                                                  keyboardType:
-                                                      TextInputType.number,
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText: 'End column',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                      ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(rangeContext),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            final values = [
-                                              int.tryParse(r1.text) ?? 1,
-                                              int.tryParse(c1.text) ?? 1,
-                                              int.tryParse(r2.text) ?? 1,
-                                              int.tryParse(c2.text) ?? 1,
-                                            ];
-                                            Navigator.pop(rangeContext, values);
-                                          },
-                                          child: const Text('Merge'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-
-                                if (result == null) {
-                                  return;
-                                }
-
-                                final startRow = (result[0] - 1).clamp(
-                                  0,
-                                  rows - 1,
-                                );
-                                final startCol = (result[1] - 1).clamp(
-                                  0,
-                                  columns - 1,
-                                );
-                                final endRow = (result[2] - 1).clamp(
-                                  0,
-                                  rows - 1,
-                                );
-                                final endCol = (result[3] - 1).clamp(
-                                  0,
-                                  columns - 1,
-                                );
-
-                                final topRow = startRow <= endRow
-                                    ? startRow
-                                    : endRow;
-                                final bottomRow = startRow <= endRow
-                                    ? endRow
-                                    : startRow;
-                                final leftCol = startCol <= endCol
-                                    ? startCol
-                                    : endCol;
-                                final rightCol = startCol <= endCol
-                                    ? endCol
-                                    : startCol;
-
-                                final parts = <String>[];
-
-                                for (var r = topRow; r <= bottomRow; r++) {
-                                  for (var c = leftCol; c <= rightCol; c++) {
-                                    final value = cells[r][c].text.trim();
-                                    if (value.isNotEmpty) {
-                                      parts.add(value);
-                                    }
-                                  }
-                                }
-
-                                setDialogState(() {
-                                  cells[topRow][leftCol].text = parts.join(
-                                    ' | ',
-                                  );
-
-                                  for (var r = topRow; r <= bottomRow; r++) {
-                                    for (var c = leftCol; c <= rightCol; c++) {
-                                      if (r == topRow && c == leftCol) {
-                                        continue;
-                                      }
-                                      cells[r][c].clear();
-                                    }
-                                  }
-                                });
-
-                                _showMessage('Cells merged successfully.');
-                              },
-                              icon: const Icon(Icons.merge_type),
-                              label: const Text('Merge'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                final result = await showDialog<List<int>?>(
-                                  context: context,
-                                  builder: (splitContext) {
-                                    final row = TextEditingController(
-                                      text: '1',
-                                    );
-                                    final column = TextEditingController(
-                                      text: '1',
-                                    );
-
-                                    return AlertDialog(
-                                      title: const Text('Split Cell'),
-                                      content: Row(
-                                        children: [
-                                          Expanded(
-                                            child: TextField(
-                                              controller: row,
-                                              keyboardType:
-                                                  TextInputType.number,
-                                              decoration: const InputDecoration(
-                                                labelText: 'Row',
-                                                border: OutlineInputBorder(),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: TextField(
-                                              controller: column,
-                                              keyboardType:
-                                                  TextInputType.number,
-                                              decoration: const InputDecoration(
-                                                labelText: 'Column',
-                                                border: OutlineInputBorder(),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(splitContext),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.pop(splitContext, [
-                                              int.tryParse(row.text) ?? 1,
-                                              int.tryParse(column.text) ?? 1,
-                                            ]);
-                                          },
-                                          child: const Text('Split'),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                );
-
-                                if (result == null) {
-                                  return;
-                                }
-
-                                final targetRow = (result[0] - 1).clamp(
-                                  0,
-                                  rows - 1,
-                                );
-                                final targetCol = (result[1] - 1).clamp(
-                                  0,
-                                  columns - 1,
-                                );
-
-                                final value = cells[targetRow][targetCol].text
-                                    .trim();
-
-                                if (!value.contains('|')) {
-                                  _showMessage(
-                                    'This cell has no merged parts to split.',
-                                  );
-                                  return;
-                                }
-
-                                final parts = value
-                                    .split('|')
-                                    .map((part) => part.trim())
-                                    .where((part) => part.isNotEmpty)
-                                    .toList();
-
-                                if (parts.isEmpty) {
-                                  _showMessage('This cell cannot be split.');
-                                  return;
-                                }
-
-                                setDialogState(() {
-                                  cells[targetRow][targetCol].text =
-                                      parts.first;
-
-                                  for (var i = 1; i < parts.length; i++) {
-                                    if (targetCol + i < columns) {
-                                      cells[targetRow][targetCol + i].text =
-                                          parts[i];
-                                    }
-                                  }
-                                });
-
-                                _showMessage('Cell split successfully.');
-                              },
-                              icon: const Icon(Icons.call_split),
-                              label: const Text('Split'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Header row'),
-                        value: headerRow,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            headerRow = value ?? true;
-                          });
-                        },
-                      ),
-                      DropdownButtonFormField<String>(
-                        initialValue: borderStyle,
-                        decoration: const InputDecoration(
-                          labelText: 'Border style',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Full',
-                            child: Text('Full borders'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Outer',
-                            child: Text('Outer border'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'None',
-                            child: Text('No borders'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setDialogState(() {
-                              borderStyle = value;
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 360),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                        ),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            child: Table(
-                              border: TableBorder.all(
-                                color: borderStyle == 'None'
-                                    ? Colors.transparent
-                                    : Colors.grey,
-                              ),
-                              defaultColumnWidth: const IntrinsicColumnWidth(),
-                              children: [
-                                for (var r = 0; r < rows; r++)
-                                  TableRow(
-                                    decoration: r == 0 && headerRow
-                                        ? const BoxDecoration(
-                                            color: Color(0xFFEFEFEF),
-                                          )
-                                        : null,
-                                    children: [
-                                      for (var c = 0; c < columns; c++)
-                                        Padding(
-                                          padding: const EdgeInsets.all(4),
-                                          child: SizedBox(
-                                            width: 120,
-                                            child: TextField(
-                                              controller: cells[r][c],
-                                              maxLines: 2,
-                                              decoration: InputDecoration(
-                                                labelText: r == 0 && headerRow
-                                                    ? 'Header ${c + 1}'
-                                                    : 'Cell ${r + 1},${c + 1}',
-                                                isDense: true,
-                                                border:
-                                                    const OutlineInputBorder(),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+        return AlertDialog(
+          title: const Text('Insert Table'),
+          content: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: rowsController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Rows',
+                    border: OutlineInputBorder(),
                   ),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    for (final row in cells) {
-                      for (final controller in row) {
-                        controller.dispose();
-                      }
-                    }
-                    Navigator.pop(dialogContext);
-                  },
-                  child: const Text('Cancel'),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: columnsController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Columns',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.table_chart),
-                  label: const Text('Insert'),
-                  onPressed: () {
-                    final buffer = StringBuffer();
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.table_chart),
+              label: const Text('Insert'),
+              onPressed: () {
+                var rows = int.tryParse(rowsController.text) ?? 3;
+                var columns = int.tryParse(columnsController.text) ?? 3;
+
+                rows = rows.clamp(1, 20);
+                columns = columns.clamp(1, 10);
+
+                final buffer = StringBuffer();
+                buffer.writeln();
+
+                for (var r = 0; r < rows; r++) {
+                  buffer.write('|');
+                  for (var c = 0; c < columns; c++) {
+                    final cell = r == 0
+                        ? ' Column ${c + 1} '
+                        : '              ';
+                    buffer.write(cell);
+                    buffer.write('|');
+                  }
+                  buffer.writeln();
+
+                  if (r == 0) {
+                    buffer.write('|');
+                    for (var c = 0; c < columns; c++) {
+                      buffer.write('--------------|');
+                    }
                     buffer.writeln();
+                  }
+                }
 
-                    for (var r = 0; r < rows; r++) {
-                      buffer.write('|');
+                buffer.writeln();
+                _insertText(buffer.toString());
 
-                      for (var c = 0; c < columns; c++) {
-                        var value = cells[r][c].text.trim();
-
-                        if (value.isEmpty && r == 0 && headerRow) {
-                          value = 'Column ${c + 1}';
-                        }
-
-                        if (value.isEmpty) {
-                          value = ' ';
-                        }
-
-                        buffer.write(' $value ');
-                        buffer.write('|');
-                      }
-
-                      buffer.writeln();
-
-                      if (r == 0 && headerRow && borderStyle != 'None') {
-                        buffer.write('|');
-
-                        for (var c = 0; c < columns; c++) {
-                          buffer.write('--------------|');
-                        }
-
-                        buffer.writeln();
-                      }
-                    }
-
-                    buffer.writeln();
-
-                    var tableText = buffer.toString();
-
-                    if (borderStyle == 'None') {
-                      tableText = tableText.replaceAll('|', '  ');
-                    } else if (borderStyle == 'Outer') {
-                      final lines = tableText.trimRight().split('\n');
-
-                      if (lines.length > 2) {
-                        final rebuilt = StringBuffer();
-
-                        for (var i = 0; i < lines.length; i++) {
-                          final line = lines[i];
-
-                          if (i == 1 && headerRow) {
-                            rebuilt.writeln(line);
-                            continue;
-                          }
-
-                          rebuilt.writeln(line);
-                        }
-
-                        tableText = rebuilt.toString();
-                      }
-                    }
-
-                    _insertText(tableText);
-
-                    for (final row in cells) {
-                      for (final controller in row) {
-                        controller.dispose();
-                      }
-                    }
-
-                    Navigator.pop(dialogContext);
-
-                    _showMessage(
-                      'Table inserted: $rows rows × $columns columns',
-                    );
-                  },
-                ),
-              ],
-            );
-          },
+                Navigator.pop(dialogContext);
+                _showMessage('Table inserted: $rows rows × $columns columns');
+              },
+            ),
+          ],
         );
       },
     );
@@ -1315,8 +815,6 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         type: FileType.image,
         allowMultiple: false,
       );
-
-      if (!mounted) return;
 
       if (result == null || result.files.isEmpty) {
         return;
@@ -1330,271 +828,63 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         return;
       }
 
-      final widthController = TextEditingController(text: '500');
-      final heightController = TextEditingController(text: '300');
-      var alignment = 'Center';
-
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return AlertDialog(
-                title: const Text('Insert Picture'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.image),
-                        title: Text(file.name),
-                        subtitle: const Text('Selected picture'),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: widthController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Width',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: heightController,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'Height',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<String>(
-                        initialValue: alignment,
-                        decoration: const InputDecoration(
-                          labelText: 'Alignment',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'Left', child: Text('Left')),
-                          DropdownMenuItem(
-                            value: 'Center',
-                            child: Text('Center'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Right',
-                            child: Text('Right'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setDialogState(() {
-                              alignment = value;
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('Cancel'),
-                  ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add_photo_alternate),
-                    label: const Text('Insert'),
-                    onPressed: () {
-                      var width = double.tryParse(widthController.text) ?? 500;
-                      var height =
-                          double.tryParse(heightController.text) ?? 300;
-
-                      width = width.clamp(50, 1000);
-                      height = height.clamp(50, 1000);
-
-                      _insertText(
-                        '\n'
-                        '[Picture]\n'
-                        'File: ${file.name}\n'
-                        'Path: $path\n'
-                        'Size: ${width.round()} × ${height.round()} px\n'
-                        'Alignment: $alignment\n'
-                        '[/Picture]\n\n',
-                      );
-
-                      Navigator.pop(dialogContext);
-                      _showMessage('Picture inserted: ${file.name}');
-                    },
-                  ),
-                ],
-              );
-            },
-          );
-        },
+      _insertText(
+        '\n[Picture: ${file.name}]\n'
+        'Image file: $path\n\n',
       );
 
-      widthController.dispose();
-      heightController.dispose();
+      _showMessage('Picture inserted: ${file.name}');
     } catch (e) {
-      _showMessage('Picture insertion failed: $e');
+      _showMessage('Could not insert picture: $e');
     }
   }
 
   void _showShapes() {
-    const shapes = <Map<String, String>>[
-      {'name': 'Rectangle', 'symbol': '▭'},
-      {'name': 'Rounded Rectangle', 'symbol': '▢'},
-      {'name': 'Circle', 'symbol': '○'},
-      {'name': 'Triangle', 'symbol': '△'},
-      {'name': 'Arrow', 'symbol': '➜'},
-      {'name': 'Left Arrow', 'symbol': '←'},
-      {'name': 'Right Arrow', 'symbol': '→'},
-      {'name': 'Up Arrow', 'symbol': '↑'},
-      {'name': 'Down Arrow', 'symbol': '↓'},
-      {'name': 'Star', 'symbol': '★'},
-      {'name': 'Diamond', 'symbol': '◇'},
-      {'name': 'Hexagon', 'symbol': '⬡'},
+    final shapes = <Map<String, String>>[
+      {'icon': '▭', 'name': 'Rectangle'},
+      {'icon': '○', 'name': 'Circle'},
+      {'icon': '△', 'name': 'Triangle'},
+      {'icon': '➜', 'name': 'Arrow'},
+      {'icon': '★', 'name': 'Star'},
+      {'icon': '◇', 'name': 'Diamond'},
     ];
 
-    showModalBottomSheet<void>(
+    showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: GridView.builder(
-              shrinkWrap: true,
-              itemCount: shapes.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 1.35,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemBuilder: (context, index) {
-                final shape = shapes[index];
-
-                return OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-
-                    final sizeController = TextEditingController(text: '120');
-                    var alignment = 'Center';
-
-                    showDialog<void>(
-                      context: context,
-                      builder: (dialogContext) {
-                        return StatefulBuilder(
-                          builder: (context, setDialogState) {
-                            return AlertDialog(
-                              title: Text('Insert ${shape['name']}'),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    shape['symbol'] ?? '',
-                                    style: const TextStyle(fontSize: 52),
-                                  ),
-                                  TextField(
-                                    controller: sizeController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Size',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  DropdownButtonFormField<String>(
-                                    initialValue: alignment,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Alignment',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 'Left',
-                                        child: Text('Left'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Center',
-                                        child: Text('Center'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Right',
-                                        child: Text('Right'),
-                                      ),
-                                    ],
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setDialogState(() {
-                                          alignment = value;
-                                        });
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(dialogContext),
-                                  child: const Text('Cancel'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    var size =
-                                        double.tryParse(sizeController.text) ??
-                                        120;
-                                    size = size.clamp(30, 600);
-
-                                    _insertText(
-                                      '\n'
-                                      '[Shape: ${shape['name']} ${shape['symbol']}]\n'
-                                      'Size: ${size.round()}\n'
-                                      'Alignment: $alignment\n'
-                                      '[/Shape]\n\n',
-                                    );
-
-                                    Navigator.pop(dialogContext);
-                                    _showMessage('${shape['name']} inserted.');
-                                  },
-                                  child: const Text('Insert'),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
-                    );
-
-                    sizeController.dispose();
-                  },
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        shape['symbol'] ?? '',
-                        style: const TextStyle(fontSize: 28),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        shape['name'] ?? '',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ],
+            padding: const EdgeInsets.all(16),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: shapes.map((shape) {
+                return SizedBox(
+                  width: 105,
+                  height: 82,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _insertText('\n${shape['icon']} ${shape['name']}\n\n');
+                      _showMessage('${shape['name']} inserted');
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          shape['icon']!,
+                          style: const TextStyle(fontSize: 28),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          shape['name']!,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ],
+                    ),
                   ),
                 );
-              },
+              }).toList(),
             ),
           ),
         );
@@ -1603,132 +893,51 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _showChart() {
-    var chartType = 'Column';
-    final titleController = TextEditingController(text: 'My Chart');
-    final dataController = TextEditingController(text: '12,28,20,35,24,42');
+    final charts = <Map<String, String>>[
+      {'icon': '▥', 'name': 'Column Chart'},
+      {'icon': '▤', 'name': 'Bar Chart'},
+      {'icon': '⌁', 'name': 'Line Chart'},
+      {'icon': '◔', 'name': 'Pie Chart'},
+    ];
 
-    showDialog<void>(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Insert Chart'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: chartType,
-                      decoration: const InputDecoration(
-                        labelText: 'Chart type',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Column',
-                          child: Text('Column'),
-                        ),
-                        DropdownMenuItem(value: 'Bar', child: Text('Bar')),
-                        DropdownMenuItem(value: 'Line', child: Text('Line')),
-                        DropdownMenuItem(value: 'Pie', child: Text('Pie')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() {
-                            chartType = value;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Chart title',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: dataController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Data values',
-                        hintText: 'Example: 12,28,20,35,24,42',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ],
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Insert Chart',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.bar_chart),
-                  label: const Text('Insert'),
-                  onPressed: () {
-                    final title = titleController.text.trim().isEmpty
-                        ? 'My Chart'
-                        : titleController.text.trim();
-
-                    final rawValues = dataController.text
-                        .split(RegExp(r'[,;\s]+'))
-                        .where((value) => value.trim().isNotEmpty)
-                        .toList();
-
-                    final values = <double>[];
-
-                    for (final raw in rawValues) {
-                      final value = double.tryParse(raw);
-                      if (value != null) {
-                        values.add(value);
-                      }
-                    }
-
-                    if (values.isEmpty) {
-                      _showMessage('Enter at least one numeric value.');
-                      return;
-                    }
-
-                    final preview = StringBuffer();
-
-                    for (var i = 0; i < values.length; i++) {
-                      final value = values[i];
-                      final bars = value.clamp(0, 40).round();
-                      preview.writeln(
-                        'Item ${i + 1}: '
-                        '${'█' * bars} ${value.toStringAsFixed(0)}',
+                const SizedBox(height: 12),
+                ...charts.map(
+                  (chart) => ListTile(
+                    leading: Text(
+                      chart['icon']!,
+                      style: const TextStyle(fontSize: 28),
+                    ),
+                    title: Text(chart['name']!),
+                    trailing: const Icon(Icons.add),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _insertText(
+                        '\n[${chart['name']}]\n'
+                        'Data: 12, 28, 20, 35, 24, 42\n\n',
                       );
-                    }
-
-                    _insertText(
-                      '\n'
-                      '[Chart: $chartType]\n'
-                      'Title: $title\n'
-                      'Data: ${values.join(', ')}\n'
-                      '${preview.toString()}'
-                      '[/Chart]\n\n',
-                    );
-
-                    Navigator.pop(dialogContext);
-                    _showMessage(
-                      '$chartType chart inserted with ${values.length} values.',
-                    );
-                  },
+                      _showMessage('${chart['name']} inserted');
+                    },
+                  ),
                 ),
               ],
-            );
-          },
+            ),
+          ),
         );
       },
     );
-
-    titleController.dispose();
-    dataController.dispose();
   }
 
   void _insertPageBreak() {
@@ -2531,602 +1740,133 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _showEquation() {
-    final equationController = TextEditingController();
-    final numeratorController = TextEditingController();
-    final denominatorController = TextEditingController();
-
-    final templates = <String>[
+    final equations = <String>[
+      'x² + y² = z²',
       'a² + b² = c²',
-      'ax² + bx + c = 0',
       'E = mc²',
       'F = ma',
-      'πr²',
+      'A = πr²',
+      'V = πr²h',
+      'x = (-b ± √(b² - 4ac)) / 2a',
+      'Σ xᵢ',
+      '∫ f(x) dx',
       '√x',
-      '∑ᵢ₌₁ⁿ i',
-      '∫ₐᵇ f(x) dx',
-      'x₁ + x₂',
-      'x² + y²',
+      'aⁿ',
+      'H₂O',
     ];
 
-    final symbols = <String>[
-      '²',
-      '³',
-      '⁰',
-      '¹',
-      '⁴',
-      '⁵',
-      '₀',
-      '₁',
-      '₂',
-      '₃',
-      '₄',
-      '₅',
-      '√',
-      '∑',
-      '∏',
-      '∫',
-      '∞',
-      'π',
-      'α',
-      'β',
-      'γ',
-      'θ',
-      'λ',
-      'μ',
-      'σ',
-      'φ',
-      'ω',
-      '±',
-      '×',
-      '÷',
-      '≠',
-      '≤',
-      '≥',
-      '≈',
-      '≡',
-      '→',
-      '←',
-      '↔',
-      '∂',
-      '∆',
-      '∇',
-    ];
-
-    void insertAtCursor(String value) {
-      final text = equationController.text;
-      final selection = equationController.selection;
-
-      final startPos = selection.start < 0 ? text.length : selection.start;
-      final endPos = selection.end < 0 ? text.length : selection.end;
-
-      final updated = text.replaceRange(startPos, endPos, value);
-
-      equationController.value = TextEditingValue(
-        text: updated,
-        selection: TextSelection.collapsed(offset: startPos + value.length),
-      );
-    }
-
-    Widget fractionPreview() {
-      final numerator = numeratorController.text.trim();
-      final denominator = denominatorController.text.trim();
-
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          border: Border.all(color: Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              numerator.isEmpty ? 'লব' : numerator,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
-            ),
-            Container(
-              width: 100,
-              height: 2,
-              color: Colors.black87,
-              margin: const EdgeInsets.symmetric(vertical: 5),
-            ),
-            Text(
-              denominator.isEmpty ? 'হর' : denominator,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-      );
-    }
-
-    showDialog<void>(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.functions),
-                  SizedBox(width: 8),
-                  Text('Equation'),
-                ],
-              ),
-              content: SizedBox(
-                width: 700,
-                height: 570,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Fraction — লব ও হর',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: numeratorController,
-                            decoration: const InputDecoration(
-                              labelText: 'লব (উপরের অংশ)',
-                              hintText: 'যেমন: a + b',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (_) {
-                              setDialogState(() {});
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 14),
-                          child: Text(
-                            '/',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: denominatorController,
-                            decoration: const InputDecoration(
-                              labelText: 'হর (নিচের অংশ)',
-                              hintText: 'যেমন: c + d',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (_) {
-                              setDialogState(() {});
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    const Text(
-                      'Fraction Preview',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-
-                    Center(child: fractionPreview()),
-
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            final n = numeratorController.text.trim();
-                            final d = denominatorController.text.trim();
-
-                            if (n.isEmpty || d.isEmpty) {
-                              _showMessage('লব এবং হর দুটোই পূরণ করুন।');
-                              return;
-                            }
-
-                            equationController.text = '($n)/($d)';
-
-                            equationController.selection =
-                                TextSelection.collapsed(
-                                  offset: equationController.text.length,
-                                );
-
-                            setDialogState(() {});
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Fraction তৈরি'),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () {
-                            numeratorController.clear();
-                            denominatorController.clear();
-                            setDialogState(() {});
-                          },
-                          child: const Text('Clear'),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    const Text(
-                      'Equation Templates',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-
-                    SizedBox(
-                      height: 70,
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          spacing: 5,
-                          runSpacing: 5,
-                          children: templates.map((item) {
-                            return OutlinedButton(
-                              onPressed: () {
-                                equationController.text = item;
-                                equationController.selection =
-                                    TextSelection.collapsed(
-                                      offset: item.length,
-                                    );
-                                setDialogState(() {});
-                              },
-                              child: Text(item),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    const Text(
-                      'Math Symbols',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 5),
-
-                    Expanded(
-                      child: GridView.builder(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 9,
-                              crossAxisSpacing: 5,
-                              mainAxisSpacing: 5,
-                            ),
-                        itemCount: symbols.length,
-                        itemBuilder: (context, index) {
-                          final symbol = symbols[index];
-
-                          return InkWell(
-                            onTap: () {
-                              insertAtCursor(symbol);
-                              setDialogState(() {});
-                            },
-                            child: Container(
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade400),
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Text(
-                                symbol,
-                                style: const TextStyle(fontSize: 19),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Insert Equation',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                  },
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    final fractionN = numeratorController.text.trim();
-                    final fractionD = denominatorController.text.trim();
-
-                    String value = equationController.text.trim();
-
-                    if (fractionN.isNotEmpty && fractionD.isNotEmpty) {
-                      value = 'Fraction: $fractionN / $fractionD';
-                    }
-
-                    if (value.isEmpty) {
-                      _showMessage('একটি Equation অথবা Fraction দিন।');
-                      return;
-                    }
-
-                    _insertText(
-                      '\n'
-                      '[Equation]\n'
-                      '$value\n'
-                      '[/Equation]\n',
-                    );
-
-                    Navigator.pop(dialogContext);
+              ...equations.map(
+                (equation) => ListTile(
+                  leading: const Icon(Icons.functions),
+                  title: Text(equation, style: const TextStyle(fontSize: 17)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _insertText('\n$equation\n\n');
                     _showMessage('Equation inserted');
                   },
-                  icon: const Icon(Icons.functions),
-                  label: const Text('Insert Equation'),
                 ),
-              ],
-            );
-          },
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
   void _showSymbolPicker() {
-    final searchController = TextEditingController();
+    final symbols = <String>[
+      '©',
+      '®',
+      '™',
+      '€',
+      '£',
+      '¥',
+      '₹',
+      '±',
+      '×',
+      '÷',
+      '≤',
+      '≥',
+      '≠',
+      '∞',
+      '√',
+      'π',
+      'α',
+      'β',
+      'γ',
+      'Δ',
+      'Ω',
+      '→',
+      '←',
+      '↑',
+      '↓',
+      '★',
+      '☆',
+      '✓',
+      '✕',
+      '♥',
+      '♦',
+      '♣',
+      '♠',
+    ];
 
-    final categories = <String, List<String>>{
-      'Common': ['©', '®', '™', '§', '¶', '†', '‡', '•', '…', '°', '№'],
-      'Math': [
-        '±',
-        '×',
-        '÷',
-        '=',
-        '≠',
-        '<',
-        '>',
-        '≤',
-        '≥',
-        '≈',
-        '≡',
-        '∞',
-        '√',
-        '∑',
-        '∏',
-        '∫',
-        '∂',
-        '∆',
-        '∇',
-        '∝',
-        '∴',
-      ],
-      'Greek': [
-        'α',
-        'β',
-        'γ',
-        'δ',
-        'ε',
-        'ζ',
-        'η',
-        'θ',
-        'ι',
-        'κ',
-        'λ',
-        'μ',
-        'ν',
-        'ξ',
-        'π',
-        'ρ',
-        'σ',
-        'τ',
-        'φ',
-        'χ',
-        'ψ',
-        'ω',
-        'Α',
-        'Β',
-        'Γ',
-        'Δ',
-        'Θ',
-        'Λ',
-        'Ξ',
-        'Π',
-        'Σ',
-        'Φ',
-        'Ψ',
-        'Ω',
-      ],
-      'Arrows': [
-        '←',
-        '→',
-        '↑',
-        '↓',
-        '↔',
-        '↕',
-        '↖',
-        '↗',
-        '↘',
-        '↙',
-        '⇒',
-        '⇐',
-        '⇑',
-        '⇓',
-        '⇔',
-        '➜',
-        '➝',
-        '➞',
-      ],
-      'Currency': ['\$', '€', '£', '¥', '₹', '৳', '₽', '₩', '₺', '₴'],
-      'Fractions': [
-        '½',
-        '⅓',
-        '⅔',
-        '¼',
-        '¾',
-        '⅕',
-        '⅖',
-        '⅗',
-        '⅘',
-        '⅙',
-        '⅚',
-        '⅛',
-        '⅜',
-        '⅝',
-        '⅞',
-      ],
-      'Shapes': [
-        '○',
-        '●',
-        '□',
-        '■',
-        '△',
-        '▲',
-        '◇',
-        '◆',
-        '☆',
-        '★',
-        '♠',
-        '♣',
-        '♥',
-        '♦',
-      ],
-      'Punctuation': ['“', '”', '‘', '’', '«', '»', '–', '—', '-', '¿', '¡'],
-    };
-
-    String selectedCategory = 'Common';
-
-    showDialog<void>(
+    showDialog(
       context: context,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final query = searchController.text.trim().toLowerCase();
-
-            final allSymbols = categories[selectedCategory] ?? [];
-
-            final symbols = query.isEmpty
-                ? allSymbols
-                : allSymbols
-                      .where((symbol) => symbol.toLowerCase().contains(query))
-                      .toList();
-
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.text_fields),
-                  SizedBox(width: 8),
-                  Text('Symbol'),
-                ],
+        return AlertDialog(
+          title: const Text('Symbol'),
+          content: SizedBox(
+            width: 340,
+            child: GridView.builder(
+              shrinkWrap: true,
+              itemCount: symbols.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 6,
               ),
-              content: SizedBox(
-                width: 700,
-                height: 520,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: searchController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        labelText: 'Search symbols',
-                        hintText: 'Search or choose a category',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) {
-                        setDialogState(() {});
-                      },
-                    ),
-                    const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final symbol = symbols[index];
 
-                    SizedBox(
-                      height: 42,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: categories.keys.map((category) {
-                            final selected = category == selectedCategory;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: ChoiceChip(
-                                label: Text(category),
-                                selected: selected,
-                                onSelected: (_) {
-                                  setDialogState(() {
-                                    selectedCategory = category;
-                                    searchController.clear();
-                                  });
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Expanded(
-                      child: symbols.isEmpty
-                          ? const Center(child: Text('No symbols found.'))
-                          : GridView.builder(
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 9,
-                                    crossAxisSpacing: 7,
-                                    mainAxisSpacing: 7,
-                                    childAspectRatio: 1.15,
-                                  ),
-                              itemCount: symbols.length,
-                              itemBuilder: (context, index) {
-                                final symbol = symbols[index];
-
-                                return Tooltip(
-                                  message: 'Insert $symbol',
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(6),
-                                    onTap: () {
-                                      _insertText(symbol);
-                                      Navigator.pop(dialogContext);
-                                      _showMessage('Symbol inserted: $symbol');
-                                    },
-                                    child: Container(
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.grey.shade400,
-                                        ),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        symbol,
-                                        style: const TextStyle(fontSize: 24),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    searchController.dispose();
+                return InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () {
                     Navigator.pop(dialogContext);
+                    _insertText(symbol);
+                    _showMessage('Symbol inserted: $symbol');
                   },
-                  child: const Text('Close'),
-                ),
-              ],
-            );
-          },
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFD0D0D0)),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(symbol, style: const TextStyle(fontSize: 21)),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
         );
       },
     );
