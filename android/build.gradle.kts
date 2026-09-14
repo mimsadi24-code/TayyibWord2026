@@ -19,18 +19,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-subprojects {
-    plugins.withId("com.android.library") {
-        if (project.name == "file_picker") {
-            extensions.configure<com.android.build.api.dsl.LibraryExtension> {
-                lint {
-                    checkReleaseBuilds = false
-                }
-            }
-        }
-    }
-}
-
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
