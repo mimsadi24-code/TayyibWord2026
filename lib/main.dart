@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,8 +13,915 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:archive/archive.dart';
 
+class TayyibEquationEmbed extends quill.CustomBlockEmbed {
+  static const String embedType = 'tayyibEquation';
+
+  TayyibEquationEmbed({
+    required String expression,
+    required String numerator,
+    required String denominator,
+  }) : super(
+         embedType,
+         jsonEncode({
+           'expression': expression,
+           'numerator': numerator,
+           'denominator': denominator,
+         }),
+       );
+
+  static String expression(dynamic data) {
+    final map = jsonDecode(data.toString());
+    return (map['expression'] ?? '').toString();
+  }
+
+  static String numerator(dynamic data) {
+    final map = jsonDecode(data.toString());
+    return (map['numerator'] ?? '').toString();
+  }
+
+  static String denominator(dynamic data) {
+    final map = jsonDecode(data.toString());
+    return (map['denominator'] ?? '').toString();
+  }
+}
+
+class TayyibEquationEmbedBuilder extends quill.EmbedBuilder {
+  @override
+  String get key => TayyibEquationEmbed.embedType;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final data = embedContext.node.value.data;
+
+    final expression = TayyibEquationEmbed.expression(data);
+    final numerator = TayyibEquationEmbed.numerator(data);
+    final denominator = TayyibEquationEmbed.denominator(data);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFD0D0D0)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Center(
+        child: numerator.isNotEmpty && denominator.isNotEmpty
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    numerator,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  Container(
+                    width: 150,
+                    height: 1.5,
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    color: Colors.black87,
+                  ),
+                  Text(
+                    denominator,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              )
+            : Text(
+                expression,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class TayyibTableEmbed extends quill.CustomBlockEmbed {
+  static const String embedType = 'tayyibTable';
+
+  TayyibTableEmbed({
+    required int rows,
+    required int columns,
+    required bool headerRow,
+    required String borderStyle,
+    required List<List<String>> cells,
+  }) : super(
+         embedType,
+         jsonEncode({
+           'rows': rows,
+           'columns': columns,
+           'headerRow': headerRow,
+           'borderStyle': borderStyle,
+           'cells': cells,
+         }),
+       );
+}
+
+class TayyibTableEmbedBuilder extends quill.EmbedBuilder {
+  @override
+  String get key => TayyibTableEmbed.embedType;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final raw = embedContext.node.value.data;
+
+    if (raw is! String) {
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final rows = (data['rows'] as num).toInt();
+      final columns = (data['columns'] as num).toInt();
+      final headerRow = data['headerRow'] == true;
+      final borderStyle = data['borderStyle']?.toString() ?? 'Full';
+      final rawCells = data['cells'] as List;
+
+      final cells = <List<String>>[];
+
+      for (var r = 0; r < rows; r++) {
+        final sourceRow = rawCells[r] as List;
+        cells.add([
+          for (var c = 0; c < columns; c++)
+            c < sourceRow.length ? '${sourceRow[c]}' : '',
+        ]);
+      }
+
+      final borderColor = borderStyle == 'None'
+          ? Colors.transparent
+          : Colors.grey.shade500;
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Table(
+            defaultColumnWidth: const IntrinsicColumnWidth(),
+            border: TableBorder.all(
+              color: borderColor,
+              width: borderStyle == 'None' ? 0 : 1,
+            ),
+            children: [
+              for (var r = 0; r < rows; r++)
+                TableRow(
+                  decoration: r == 0 && headerRow
+                      ? BoxDecoration(color: Colors.grey.shade200)
+                      : null,
+                  children: [
+                    for (var c = 0; c < columns; c++)
+                      Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 100,
+                          minHeight: 42,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        child: TextField(
+                          controller: TextEditingController(text: cells[r][c]),
+                          maxLines: null,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            border: InputBorder.none,
+                            hintText: r == 0 && headerRow
+                                ? 'Header ${c + 1}'
+                                : 'Cell ${r + 1},${c + 1}',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      );
+    } catch (_) {
+      return const Text('[Table]');
+    }
+  }
+}
+
+class TayyibTextBoxEmbed extends quill.CustomBlockEmbed {
+  static const String embedType = 'tayyibTextBox';
+
+  TayyibTextBoxEmbed({required String text, required String style})
+    : super(embedType, jsonEncode({'text': text, 'style': style}));
+}
+
+class TayyibTextBoxEmbedBuilder extends quill.EmbedBuilder {
+  @override
+  String get key => TayyibTextBoxEmbed.embedType;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final raw = embedContext.node.value.data;
+
+    if (raw is! String) {
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final text = data['text']?.toString() ?? '';
+      final style = data['style']?.toString() ?? 'Simple';
+
+      Color background;
+      Color border;
+
+      switch (style) {
+        case 'Blue':
+          background = const Color(0xFFEAF3FF);
+          border = const Color(0xFF5B9BD5);
+          break;
+        case 'Green':
+          background = const Color(0xFFEAF7EA);
+          border = const Color(0xFF70AD47);
+          break;
+        case 'Yellow':
+          background = const Color(0xFFFFF9E6);
+          border = const Color(0xFFD6B656);
+          break;
+        default:
+          background = Colors.white;
+          border = Colors.grey;
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: background,
+            border: Border.all(color: border, width: 1.5),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(text, style: const TextStyle(fontSize: 14, height: 1.35)),
+        ),
+      );
+    } catch (_) {
+      return const Text('[Text Box]');
+    }
+  }
+}
+
+class TayyibPictureEmbed extends quill.CustomBlockEmbed {
+  static const String embedType = 'tayyibPicture';
+
+  TayyibPictureEmbed({
+    required String path,
+    required double width,
+    required double height,
+    required String alignment,
+  }) : super(
+         embedType,
+         jsonEncode({
+           'path': path,
+           'width': width,
+           'height': height,
+           'alignment': alignment,
+         }),
+       );
+}
+
+class TayyibPictureEmbedBuilder extends quill.EmbedBuilder {
+  @override
+  String get key => TayyibPictureEmbed.embedType;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final raw = embedContext.node.value.data;
+
+    if (raw is! String) {
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+
+      final path = data['path']?.toString() ?? '';
+      final width = (data['width'] as num?)?.toDouble() ?? 500;
+      final height = (data['height'] as num?)?.toDouble() ?? 300;
+      final alignment = data['alignment']?.toString() ?? 'Center';
+
+      if (path.isEmpty || !File(path).existsSync()) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.broken_image, color: Colors.grey),
+              SizedBox(width: 8),
+              Text('Picture not available'),
+            ],
+          ),
+        );
+      }
+
+      Alignment imageAlignment;
+
+      switch (alignment) {
+        case 'Left':
+          imageAlignment = Alignment.centerLeft;
+          break;
+        case 'Right':
+          imageAlignment = Alignment.centerRight;
+          break;
+        case 'Center':
+        default:
+          imageAlignment = Alignment.center;
+          break;
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Align(
+          alignment: imageAlignment,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Image.file(
+              File(path),
+              width: width,
+              height: height,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: width,
+                  height: height,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                  ),
+                  child: const Icon(
+                    Icons.broken_image,
+                    size: 42,
+                    color: Colors.grey,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    } catch (_) {
+      return const Text('[Picture]');
+    }
+  }
+}
+
+class TayyibWordArtEmbed extends quill.CustomBlockEmbed {
+  static const String embedType = 'tayyibWordArt';
+
+  TayyibWordArtEmbed({required String text, required String style})
+    : super(embedType, jsonEncode({'text': text, 'style': style}));
+}
+
+class TayyibWordArtEmbedBuilder extends quill.EmbedBuilder {
+  @override
+  String get key => TayyibWordArtEmbed.embedType;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final raw = embedContext.node.value.data;
+
+    if (raw is! String) {
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final text = data['text']?.toString() ?? '';
+      final style = data['style']?.toString() ?? 'Classic';
+
+      FontWeight weight = FontWeight.bold;
+      FontStyle fontStyle = FontStyle.normal;
+      Color textColor = const Color(0xFF1F4E79);
+      Color? backgroundColor;
+      Color? shadowColor;
+      double fontSize = 28;
+
+      switch (style) {
+        case 'Bold':
+          weight = FontWeight.w900;
+          textColor = const Color(0xFF0B5394);
+          fontSize = 30;
+          break;
+
+        case 'Outline':
+          weight = FontWeight.bold;
+          textColor = Colors.white;
+          backgroundColor = const Color(0xFF4472C4);
+          fontSize = 30;
+          break;
+
+        case 'Shadow':
+          weight = FontWeight.bold;
+          textColor = const Color(0xFF7030A0);
+          shadowColor = Colors.black38;
+          fontSize = 30;
+          break;
+
+        case 'Banner':
+          weight = FontWeight.w900;
+          textColor = Colors.white;
+          backgroundColor = const Color(0xFFED7D31);
+          fontSize = 28;
+          break;
+
+        case 'Classic':
+        default:
+          weight = FontWeight.bold;
+          fontStyle = FontStyle.normal;
+          textColor = const Color(0xFF1F4E79);
+          fontSize = 28;
+          break;
+      }
+
+      Widget wordArt = Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: weight,
+          fontStyle: fontStyle,
+          color: textColor,
+          letterSpacing: 0.5,
+          shadows: shadowColor == null
+              ? null
+              : [
+                  Shadow(
+                    color: shadowColor,
+                    offset: const Offset(3, 3),
+                    blurRadius: 3,
+                  ),
+                ],
+        ),
+      );
+
+      if (backgroundColor != null) {
+        wordArt = Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.black26),
+          ),
+          child: wordArt,
+        );
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Center(child: wordArt),
+      );
+    } catch (_) {
+      return const Text('[WordArt]');
+    }
+  }
+}
+
+class TayyibChartEmbed extends quill.CustomBlockEmbed {
+  static const String embedType = 'tayyibChart';
+
+  TayyibChartEmbed({
+    required String chartType,
+    required String title,
+    required List<double> values,
+  }) : super(
+         embedType,
+         jsonEncode({'type': chartType, 'title': title, 'values': values}),
+       );
+}
+
+class TayyibChartEmbedBuilder extends quill.EmbedBuilder {
+  @override
+  String get key => TayyibChartEmbed.embedType;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final raw = embedContext.node.value.data;
+
+    if (raw is! String) {
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final type = data['type']?.toString() ?? 'Column';
+      final title = data['title']?.toString() ?? 'My Chart';
+      final rawValues = data['values'];
+
+      if (rawValues is! List) {
+        return const SizedBox.shrink();
+      }
+
+      final values = <double>[
+        for (final value in rawValues)
+          if (value is num) value.toDouble(),
+      ];
+
+      if (values.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Container(
+          width: double.infinity,
+          height: 320,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFD0D0D0)),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: CustomPaint(
+                  painter: TayyibChartPainter(chartType: type, values: values),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (_) {
+      return const Text('[Chart]');
+    }
+  }
+}
+
+class TayyibChartPainter extends CustomPainter {
+  final String chartType;
+  final List<double> values;
+
+  TayyibChartPainter({required this.chartType, required this.values});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+
+    final maxValue = values.reduce(math.max);
+    final safeMax = maxValue <= 0 ? 1.0 : maxValue;
+
+    const left = 38.0;
+    const top = 10.0;
+    const right = 10.0;
+    const bottom = 24.0;
+
+    final width = size.width - left - right;
+    final height = size.height - top - bottom;
+
+    final axisPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    canvas.drawLine(
+      const Offset(left, top),
+      Offset(left, top + height),
+      axisPaint,
+    );
+
+    canvas.drawLine(
+      Offset(left, top + height),
+      Offset(left + width, top + height),
+      axisPaint,
+    );
+
+    if (chartType == 'Pie') {
+      _paintPie(canvas, size);
+      return;
+    }
+
+    if (chartType == 'Line') {
+      _paintLine(canvas, left, top, width, height, safeMax);
+      return;
+    }
+
+    final slot = width / values.length;
+
+    for (var i = 0; i < values.length; i++) {
+      final value = values[i];
+      final barHeight = height * (value / safeMax);
+
+      final barWidth = math.min(42.0, slot * 0.65);
+
+      final x = left + i * slot + (slot - barWidth) / 2;
+
+      final y = top + height - barHeight;
+
+      final paint = Paint()..style = PaintingStyle.fill;
+
+      paint.color = Colors.blueGrey.shade600;
+
+      canvas.drawRect(Rect.fromLTWH(x, y, barWidth, barHeight), paint);
+
+      _drawText(
+        canvas,
+        value.toStringAsFixed(0),
+        Offset(x + barWidth / 2, math.max(top, y - 15)),
+        centered: true,
+      );
+
+      _drawText(
+        canvas,
+        '${i + 1}',
+        Offset(x + barWidth / 2, top + height + 4),
+        centered: true,
+      );
+    }
+  }
+
+  void _paintLine(
+    Canvas canvas,
+    double left,
+    double top,
+    double width,
+    double height,
+    double maxValue,
+  ) {
+    if (values.length < 2) return;
+
+    final linePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+
+    linePaint.color = Colors.blueGrey.shade700;
+
+    final pointPaint = Paint()..style = PaintingStyle.fill;
+
+    pointPaint.color = Colors.blueGrey.shade700;
+
+    final path = Path();
+
+    for (var i = 0; i < values.length; i++) {
+      final x = left + width * (i / (values.length - 1));
+
+      final y = top + height - height * (values[i] / maxValue);
+
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+
+      canvas.drawCircle(Offset(x, y), 4, pointPaint);
+
+      _drawText(
+        canvas,
+        values[i].toStringAsFixed(0),
+        Offset(x, math.max(top, y - 15)),
+        centered: true,
+      );
+    }
+
+    canvas.drawPath(path, linePaint);
+  }
+
+  void _paintPie(Canvas canvas, Size size) {
+    final total = values.fold<double>(
+      0,
+      (sum, value) => sum + math.max(0, value),
+    );
+
+    if (total <= 0) return;
+
+    final radius = math.min(size.width, size.height) * 0.32;
+
+    final center = Offset(size.width * 0.38, size.height * 0.52);
+
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    var start = -math.pi / 2;
+
+    for (var i = 0; i < values.length; i++) {
+      final value = math.max(0, values[i]);
+
+      if (value == 0) continue;
+
+      final sweep = 2 * math.pi * value / total;
+
+      paint.color = Colors.primaries[i % Colors.primaries.length].shade600;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        start,
+        sweep,
+        true,
+        paint,
+      );
+
+      start += sweep;
+    }
+
+    for (var i = 0; i < values.length; i++) {
+      final y = 12 + i * 22.0;
+
+      paint.color = Colors.primaries[i % Colors.primaries.length].shade600;
+
+      canvas.drawRect(Rect.fromLTWH(size.width * 0.70, y, 11, 11), paint);
+
+      _drawText(
+        canvas,
+        'Item ${i + 1}: ${values[i].toStringAsFixed(0)}',
+        Offset(size.width * 0.70 + 17, y),
+      );
+    }
+  }
+
+  void _drawText(
+    Canvas canvas,
+    String text,
+    Offset position, {
+    bool centered = false,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(fontSize: 9, color: Colors.black87),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+
+    painter.layout();
+
+    final offset = centered
+        ? Offset(position.dx - painter.width / 2, position.dy)
+        : position;
+
+    painter.paint(canvas, offset);
+  }
+
+  @override
+  bool shouldRepaint(covariant TayyibChartPainter oldDelegate) {
+    return oldDelegate.chartType != chartType || oldDelegate.values != values;
+  }
+}
+
 void main() {
   runApp(const TayyibWordApp());
+}
+
+class TayyibShapeEmbed extends quill.CustomBlockEmbed {
+  static const String embedType = "tayyibShape";
+  TayyibShapeEmbed({
+    required String name,
+    required double size,
+    required String alignment,
+  }) : super(
+         embedType,
+         jsonEncode({"name": name, "size": size, "alignment": alignment}),
+       );
+}
+
+class TayyibShapeEmbedBuilder extends quill.EmbedBuilder {
+  @override
+  String get key => TayyibShapeEmbed.embedType;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    final raw = embedContext.node.value.data;
+    if (raw is! String) return const SizedBox.shrink();
+    try {
+      final d = jsonDecode(raw) as Map<String, dynamic>;
+      final name = d["name"]?.toString() ?? "Rectangle";
+      final size = (d["size"] as num?)?.toDouble() ?? 120;
+      final a = d["alignment"]?.toString() ?? "Center";
+      return Align(
+        alignment: a == "Left"
+            ? Alignment.centerLeft
+            : a == "Right"
+            ? Alignment.centerRight
+            : Alignment.center,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: CustomPaint(
+            size: Size(size, size),
+            painter: TayyibShapePainter(name),
+          ),
+        ),
+      );
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+  }
+}
+
+class TayyibShapePainter extends CustomPainter {
+  final String name;
+  TayyibShapePainter(this.name);
+
+  @override
+  void paint(Canvas c, Size s) {
+    final f = Paint()
+      ..color = const Color(0xFF5B9BD5)
+      ..style = PaintingStyle.fill;
+    final p = Paint()
+      ..color = const Color(0xFF1F4E79)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+    final w = s.width, h = s.height, x = w / 2, y = h / 2;
+    Path q = Path();
+
+    if (name == "Circle") {
+      c.drawCircle(Offset(x, y), w / 2 - 5, f);
+      c.drawCircle(Offset(x, y), w / 2 - 5, p);
+      return;
+    }
+    if (name == "Rounded Rectangle") {
+      final r = RRect.fromRectAndRadius(
+        Rect.fromLTWH(5, 5, w - 10, h - 10),
+        const Radius.circular(18),
+      );
+      c.drawRRect(r, f);
+      c.drawRRect(r, p);
+      return;
+    }
+    if (name == "Triangle") {
+      q
+        ..moveTo(x, 5)
+        ..lineTo(w - 5, h - 5)
+        ..lineTo(5, h - 5)
+        ..close();
+    } else if (name == "Diamond") {
+      q
+        ..moveTo(x, 5)
+        ..lineTo(w - 5, y)
+        ..lineTo(x, h - 5)
+        ..lineTo(5, y)
+        ..close();
+    } else if (name == "Hexagon") {
+      q
+        ..moveTo(w * .25, 5)
+        ..lineTo(w * .75, 5)
+        ..lineTo(w - 5, y)
+        ..lineTo(w * .75, h - 5)
+        ..lineTo(w * .25, h - 5)
+        ..lineTo(5, y)
+        ..close();
+    } else if (name.contains("Arrow")) {
+      q
+        ..moveTo(5, y * .55)
+        ..lineTo(w * .58, y * .55)
+        ..lineTo(w * .58, 5)
+        ..lineTo(w - 5, y)
+        ..lineTo(w * .58, h - 5)
+        ..lineTo(w * .58, y * 1.45)
+        ..lineTo(5, y * 1.45)
+        ..close();
+    } else if (name == "Star") {
+      q
+        ..moveTo(x, 5)
+        ..lineTo(x * 1.18, y * .7)
+        ..lineTo(w - 5, y * .7)
+        ..lineTo(x * 1.28, y * 1.05)
+        ..lineTo(w * .88, h - 5)
+        ..lineTo(x, y * 1.28)
+        ..lineTo(w * .12, h - 5)
+        ..lineTo(x * .72, y * 1.05)
+        ..lineTo(5, y * .7)
+        ..lineTo(x * .82, y * .7)
+        ..close();
+    } else {
+      final r = Rect.fromLTWH(5, 5, w - 10, h - 10);
+      c.drawRect(r, f);
+      c.drawRect(r, p);
+      return;
+    }
+    c.drawPath(q, f);
+    c.drawPath(q, p);
+  }
+
+  @override
+  bool shouldRepaint(covariant TayyibShapePainter old) => old.name != name;
 }
 
 class TayyibWordApp extends StatelessWidget {
@@ -42,6 +951,7 @@ class WordEditorScreen extends StatefulWidget {
 
 class _WordEditorScreenState extends State<WordEditorScreen> {
   final TextEditingController _controller = TextEditingController();
+  late final quill.QuillController _quillController;
 
   String _currentFileName = 'Document1.txt';
   String _activeTab = 'Home';
@@ -54,11 +964,17 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   bool _isSubscript = false;
 
   double _fontSize = 11;
+  // Retained for rich-text paragraph formatting.
+  double _lineSpacing = 1.25;
   String _fontName = 'Calibri';
+  final TextEditingController _fontNameController = TextEditingController();
+  final TextEditingController _fontSizeController = TextEditingController();
+  // Retained for rich-text font-set formatting.
+  String _fontSetName = 'Office';
+  bool _formatPainterActive = false;
 
   // Page Layout settings
   String _themeName = 'Office';
-  String _fontSetName = 'Office';
   double _marginTop = 72.0;
   double _marginBottom = 72.0;
   double _marginLeft = 82.0;
@@ -69,7 +985,6 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   String _watermark = '';
   Color _pageColor = Colors.white;
   String _pageBorderStyle = 'None';
-  double _lineSpacing = 1.25;
   double _zoom = 1.0;
   bool _showRuler = true;
   bool _showGridlines = false;
@@ -92,19 +1007,52 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   void initState() {
     super.initState();
 
-    _controller.text =
+    const initialText =
         'Welcome to Tayyib Word\n\n'
         'This is your document. Start typing here...';
 
+    _controller.text = initialText;
+    _fontNameController.text = _fontName;
+    _fontSizeController.text = _fontSize.toInt().toString();
+
+    _quillController = quill.QuillController(
+      document: quill.Document.fromJson([
+        {'insert': initialText},
+      ]),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+
+    _quillController.addListener(_syncQuillToTextController);
     _controller.addListener(_updateWordCount);
     _updateWordCount();
   }
 
   @override
   void dispose() {
+    _quillController.removeListener(_syncQuillToTextController);
+    _quillController.dispose();
     _controller.removeListener(_updateWordCount);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _syncQuillToTextController() {
+    final plainText = _quillController.document.toPlainText();
+
+    if (_controller.text == plainText) {
+      return;
+    }
+
+    final currentOffset = _controller.selection.isValid
+        ? _controller.selection.baseOffset
+        : plainText.length;
+
+    final safeOffset = currentOffset.clamp(0, plainText.length);
+
+    _controller.value = TextEditingValue(
+      text: plainText,
+      selection: TextSelection.collapsed(offset: safeOffset),
+    );
   }
 
   void _updateWordCount() {
@@ -132,24 +1080,90 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['txt', 'html'],
+        allowedExtensions: ['txt', 'html', 'htm', 'docx', 'pdf'],
       );
 
       if (result == null || result.files.single.path == null) return;
 
       final path = result.files.single.path!;
-      final file = File(path);
-      final contents = await file.readAsString();
+      final name = result.files.single.name;
+      final lowerName = name.toLowerCase();
+
+      if (lowerName.endsWith('.pdf')) {
+        _showMessage(
+          'PDF can be viewed/printed, but importing PDF text for editing is not supported yet.',
+        );
+        return;
+      }
+
+      String contents;
+
+      if (lowerName.endsWith('.docx')) {
+        final bytes = await File(path).readAsBytes();
+
+        try {
+          final archive = ZipDecoder().decodeBytes(bytes);
+          final documentFile = archive.files.firstWhere(
+            (file) => file.name == 'word/document.xml',
+          );
+
+          final xml = utf8.decode(documentFile.content as List<int>);
+
+          contents = xml
+              .replaceAll(RegExp(r'<w:tab[^>]*/>'), '\t')
+              .replaceAll(RegExp(r'</w:p>'), '\n')
+              .replaceAll(RegExp(r'<w:br[^>]*/>'), '\n')
+              .replaceAll(RegExp(r'<[^>]+>'), '')
+              .replaceAll('&amp;', '&')
+              .replaceAll('&lt;', '<')
+              .replaceAll('&gt;', '>')
+              .replaceAll('&quot;', '"')
+              .replaceAll('&apos;', "'");
+
+          contents = contents.trimRight();
+        } catch (e) {
+          throw Exception('Invalid or unsupported DOCX file: $e');
+        }
+      } else {
+        contents = await File(path).readAsString();
+
+        if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
+          contents = contents
+              .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+              .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n')
+              .replaceAll(RegExp(r'</div>', caseSensitive: false), '\n')
+              .replaceAll(RegExp(r'<[^>]*>'), '')
+              .replaceAll('&nbsp;', ' ')
+              .replaceAll('&amp;', '&')
+              .replaceAll('&lt;', '<')
+              .replaceAll('&gt;', '>')
+              .replaceAll('&quot;', '"')
+              .replaceAll('&#39;', "'");
+        }
+      }
+
+      final safeText = contents;
+
+      _quillController = quill.QuillController(
+        document: quill.Document.fromJson([
+          {'insert': safeText.isEmpty ? '\n' : safeText},
+        ]),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+
+      _quillController.addListener(_syncQuillToTextController);
 
       setState(() {
-        _controller.text = contents;
-        _currentFileName = result.files.single.name;
+        _controller.text = safeText;
+        _currentFileName = name;
       });
 
+      _updateWordCount();
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Opened: ${result.files.single.name}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Opened: $name')));
       }
     } catch (e) {
       _showMessage('Could not open file: $e');
@@ -181,106 +1195,341 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         .replaceAll("'", '&apos;');
   }
 
-  String _createHtmlDocument(String text) {
-    final body = text
-        .split('\n')
-        .map((line) => '<p>${_xmlEscape(line)}</p>')
-        .join();
-
-    return '<!DOCTYPE html>\n'
-        '<html lang="en">\n'
-        '<head>\n'
-        '<meta charset="UTF-8">\n'
-        '<title>${_xmlEscape(_baseDocumentName(_currentFileName))}</title>\n'
-        '<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.35;margin:72px;}p{margin:0 0 8px 0;}</style>\n'
-        '</head>\n'
-        '<body>\n'
-        '$body\n'
-        '</body>\n'
-        '</html>';
+  String _quillPlainText() {
+    return _quillController.document.toPlainText();
   }
 
-  Future<List<int>> _createPdfBytes(String text) async {
+  List<dynamic> _quillOperations() {
+    return _quillController.document.toDelta().toList();
+  }
+
+  String _htmlEscape(String value) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+  }
+
+  String _quillTextStyleHtml(Map<dynamic, dynamic>? attributes) {
+    if (attributes == null || attributes.isEmpty) {
+      return '';
+    }
+
+    final styles = <String>[];
+
+    if (attributes['bold'] != null && attributes['bold'] != false) {
+      styles.add('font-weight:bold');
+    }
+
+    if (attributes['italic'] != null && attributes['italic'] != false) {
+      styles.add('font-style:italic');
+    }
+
+    if (attributes['underline'] != null && attributes['underline'] != false) {
+      styles.add('text-decoration:underline');
+    }
+
+    final font = attributes['font'];
+    if (font != null && font.toString().trim().isNotEmpty) {
+      styles.add('font-family:${_htmlEscape(font.toString())}');
+    }
+
+    final size = attributes['size'];
+    if (size != null) {
+      final value = size.toString();
+      final numeric = double.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), ''));
+      if (numeric != null && numeric > 0) {
+        styles.add('font-size:${numeric}pt');
+      }
+    }
+
+    final color = attributes['color'];
+    if (color != null && color.toString().trim().isNotEmpty) {
+      styles.add('color:${_htmlEscape(color.toString())}');
+    }
+
+    final background = attributes['background'];
+    if (background != null && background.toString().trim().isNotEmpty) {
+      styles.add('background-color:${_htmlEscape(background.toString())}');
+    }
+
+    if (styles.isEmpty) {
+      return '';
+    }
+
+    return ' style="${styles.join(';')}"';
+  }
+
+  String _createHtmlDocumentFromQuill() {
+    final buffer = StringBuffer();
+
+    buffer.writeln('<!DOCTYPE html>');
+    buffer.writeln('<html lang="en">');
+    buffer.writeln('<head>');
+    buffer.writeln('<meta charset="UTF-8">');
+    buffer.writeln(
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    );
+    buffer.writeln(
+      '<title>${_htmlEscape(_baseDocumentName(_currentFileName))}</title>',
+    );
+
+    buffer.writeln(
+      '<style>'
+      'body{font-family:Calibri,Arial,sans-serif;font-size:11pt;'
+      'line-height:1.35;margin:72px;}'
+      'p{margin:0 0 8px 0;}'
+      '</style>',
+    );
+
+    buffer.writeln('</head>');
+    buffer.writeln('<body>');
+
+    final ops = _quillOperations();
+
+    for (final op in ops) {
+      final dynamic data = op.data;
+      final dynamic attributes = op.attributes;
+
+      if (data is! String) {
+        continue;
+      }
+
+      final attrs = attributes is Map ? attributes : null;
+      final style = _quillTextStyleHtml(attrs);
+      final escaped = _htmlEscape(data);
+
+      if (style.isEmpty) {
+        buffer.write(escaped.replaceAll('\n', '<br>'));
+      } else {
+        buffer.write('<span$style>${escaped.replaceAll('\n', '<br>')}</span>');
+      }
+    }
+
+    buffer.writeln('</body>');
+    buffer.writeln('</html>');
+
+    return buffer.toString();
+  }
+
+  pw.TextStyle _quillPdfTextStyle(Map<dynamic, dynamic>? attributes) {
+    double fontSize = 11;
+    var fontWeight = pw.FontWeight.normal;
+    var fontStyle = pw.FontStyle.normal;
+
+    if (attributes != null) {
+      if (attributes['bold'] != null && attributes['bold'] != false) {
+        fontWeight = pw.FontWeight.bold;
+      }
+
+      if (attributes['italic'] != null && attributes['italic'] != false) {
+        fontStyle = pw.FontStyle.italic;
+      }
+
+      final size = attributes['size'];
+      if (size != null) {
+        final parsed = double.tryParse(
+          size.toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+        );
+        if (parsed != null && parsed > 0) {
+          fontSize = parsed;
+        }
+      }
+    }
+
+    return pw.TextStyle(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      fontStyle: fontStyle,
+    );
+  }
+
+  Future<List<int>> _createPdfBytesFromQuill() async {
     final pdf = pw.Document();
+    final ops = _quillOperations();
+
+    final spans = <pw.InlineSpan>[];
+
+    for (final op in ops) {
+      final dynamic data = op.data;
+      final dynamic attributes = op.attributes;
+
+      if (data is! String || data.isEmpty) {
+        continue;
+      }
+
+      final attrs = attributes is Map ? attributes : null;
+
+      spans.add(pw.TextSpan(text: data, style: _quillPdfTextStyle(attrs)));
+    }
+
+    if (spans.isEmpty) {
+      spans.add(
+        const pw.TextSpan(text: ' ', style: pw.TextStyle(fontSize: 11)),
+      );
+    }
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(54),
-        build: (context) => [
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: text
-                .split('\n')
-                .map(
-                  (line) => pw.Padding(
-                    padding: const pw.EdgeInsets.only(bottom: 6),
-                    child: pw.Text(
-                      line.isEmpty ? ' ' : line,
-                      style: const pw.TextStyle(fontSize: 11),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
+        build: (context) => [pw.RichText(text: pw.TextSpan(children: spans))],
       ),
     );
 
     return pdf.save();
   }
 
-  Future<List<int>> _createDocxBytes(String text) async {
-    final archive = Archive();
+  String _docxRunProperties(Map<dynamic, dynamic>? attributes) {
+    if (attributes == null || attributes.isEmpty) {
+      return '';
+    }
 
-    final paragraphs = text.split('\n').map((line) {
-      final value = _xmlEscape(line);
-      return '<w:p><w:r><w:t xml:space="preserve">${value.isEmpty ? ' ' : value}</w:t></w:r></w:p>';
-    }).join();
+    final parts = <String>[];
+
+    if (attributes['bold'] != null && attributes['bold'] != false) {
+      parts.add('<w:b/>');
+    }
+
+    if (attributes['italic'] != null && attributes['italic'] != false) {
+      parts.add('<w:i/>');
+    }
+
+    if (attributes['underline'] != null && attributes['underline'] != false) {
+      parts.add('<w:u w:val="single"/>');
+    }
+
+    final font = attributes['font'];
+    if (font != null && font.toString().trim().isNotEmpty) {
+      final escaped = _xmlEscape(font.toString());
+      parts.add(
+        '<w:rFonts w:ascii="$escaped" w:hAnsi="$escaped" w:eastAsia="$escaped"/>',
+      );
+    }
+
+    final size = attributes['size'];
+    if (size != null) {
+      final parsed = double.tryParse(
+        size.toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+      );
+
+      if (parsed != null && parsed > 0) {
+        final halfPoints = (parsed * 2).round();
+        parts.add('<w:sz w:val="$halfPoints"/>');
+        parts.add('<w:szCs w:val="$halfPoints"/>');
+      }
+    }
+
+    if (parts.isEmpty) {
+      return '';
+    }
+
+    return '<w:rPr>${parts.join()}</w:rPr>';
+  }
+
+  String _createDocxDocumentXmlFromQuill() {
+    final buffer = StringBuffer();
+
+    buffer.write(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      '<w:document '
+      'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+      '<w:body>',
+    );
+
+    final ops = _quillOperations();
+
+    var paragraph = StringBuffer();
+    var paragraphHasContent = false;
+
+    void flushParagraph() {
+      if (!paragraphHasContent) {
+        buffer.write(
+          '<w:p><w:r><w:t xml:space="preserve"> '
+          '</w:t></w:r></w:p>',
+        );
+      } else {
+        buffer.write('<w:p>${paragraph.toString()}</w:p>');
+      }
+
+      paragraph = StringBuffer();
+      paragraphHasContent = false;
+    }
+
+    for (final op in ops) {
+      final dynamic data = op.data;
+      final dynamic attributes = op.attributes;
+
+      if (data is! String) {
+        continue;
+      }
+
+      final attrs = attributes is Map ? attributes : null;
+      final rPr = _docxRunProperties(attrs);
+
+      final parts = data.split('\n');
+
+      for (var i = 0; i < parts.length; i++) {
+        final part = parts[i];
+
+        if (part.isNotEmpty) {
+          paragraph.write(
+            '<w:r>$rPr'
+            '<w:t xml:space="preserve">${_xmlEscape(part)}</w:t>'
+            '</w:r>',
+          );
+
+          paragraphHasContent = true;
+        }
+
+        if (i < parts.length - 1) {
+          flushParagraph();
+        }
+      }
+    }
+
+    flushParagraph();
+
+    buffer.write(
+      '<w:sectPr>'
+      '<w:pgSz w:w="11906" w:h="16838"/>'
+      '<w:pgMar w:top="1440" w:right="1440" '
+      'w:bottom="1440" w:left="1440" '
+      'w:header="720" w:footer="720" w:gutter="0"/>'
+      '</w:sectPr>'
+      '</w:body>'
+      '</w:document>',
+    );
+
+    return buffer.toString();
+  }
+
+  Future<List<int>> _createDocxBytesFromQuill() async {
+    final archive = Archive();
 
     const contentTypes =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="rels" '
+        'ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
         '<Default Extension="xml" ContentType="application/xml"/>'
-        '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
-        '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
-        '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        '<Override PartName="/docProps/core.xml" '
+        'ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+        '<Override PartName="/docProps/app.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
         '</Types>';
 
     const rels =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="word/document.xml"/>'
         '</Relationships>';
-
-    final document =
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        '<w:body>$paragraphs'
-        '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
-        '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/>'
-        '</w:sectPr></w:body></w:document>';
-
-    archive.addFile(
-      ArchiveFile(
-        '[Content_Types].xml',
-        contentTypes.codeUnits.length,
-        contentTypes.codeUnits,
-      ),
-    );
-
-    archive.addFile(
-      ArchiveFile('_rels/.rels', rels.codeUnits.length, rels.codeUnits),
-    );
-
-    archive.addFile(
-      ArchiveFile(
-        'word/document.xml',
-        document.codeUnits.length,
-        document.codeUnits,
-      ),
-    );
 
     const documentRels =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -306,6 +1555,28 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         '<dc:creator>Tayyib Word</dc:creator>'
         '<cp:lastModifiedBy>Tayyib Word</cp:lastModifiedBy>'
         '</cp:coreProperties>';
+
+    final document = _createDocxDocumentXmlFromQuill();
+
+    archive.addFile(
+      ArchiveFile(
+        '[Content_Types].xml',
+        contentTypes.codeUnits.length,
+        contentTypes.codeUnits,
+      ),
+    );
+
+    archive.addFile(
+      ArchiveFile('_rels/.rels', rels.codeUnits.length, rels.codeUnits),
+    );
+
+    archive.addFile(
+      ArchiveFile(
+        'word/document.xml',
+        document.codeUnits.length,
+        document.codeUnits,
+      ),
+    );
 
     archive.addFile(
       ArchiveFile(
@@ -338,7 +1609,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     try {
       final directory = await _exportDirectory();
       final base = _baseDocumentName(fileName);
-      final text = _controller.text;
+      final plainText = _quillPlainText();
 
       late String extension;
       late List<int> bytes;
@@ -346,22 +1617,22 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
       switch (type) {
         case 'TXT':
           extension = '.txt';
-          bytes = utf8.encode(text);
+          bytes = utf8.encode(plainText);
           break;
 
         case 'HTML':
           extension = '.html';
-          bytes = utf8.encode(_createHtmlDocument(text));
+          bytes = utf8.encode(_createHtmlDocumentFromQuill());
           break;
 
         case 'DOCX':
           extension = '.docx';
-          bytes = await _createDocxBytes(text);
+          bytes = await _createDocxBytesFromQuill();
           break;
 
         case 'PDF':
           extension = '.pdf';
-          bytes = await _createPdfBytes(text);
+          bytes = await _createPdfBytesFromQuill();
           break;
 
         default:
@@ -399,7 +1670,17 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   Future<void> _saveFile() async {
-    await _exportDocument('TXT', _currentFileName);
+    final lowerName = _currentFileName.toLowerCase();
+
+    if (lowerName.endsWith('.docx')) {
+      await _exportDocument('DOCX', _currentFileName);
+    } else if (lowerName.endsWith('.pdf')) {
+      await _exportDocument('PDF', _currentFileName);
+    } else if (lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
+      await _exportDocument('HTML', _currentFileName);
+    } else {
+      await _exportDocument('TXT', _currentFileName);
+    }
   }
 
   Future<void> _saveAsDialog() async {
@@ -486,7 +1767,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
   Future<void> _printDocument() async {
     try {
-      final bytes = await _createPdfBytes(_controller.text);
+      final bytes = await _createPdfBytesFromQuill();
 
       await Printing.layoutPdf(
         onLayout: (format) async => Uint8List.fromList(bytes),
@@ -494,6 +1775,131 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     } catch (e) {
       _showMessage('Could not print document: $e');
     }
+  }
+
+  Future<void> _showOptionsDialog() async {
+    String selectedFont = _fontName;
+    double selectedSize = _fontSize;
+
+    const availableFonts = [
+      'Calibri',
+      'Arial',
+      'Times New Roman',
+      'Courier New',
+      'Georgia',
+      'Verdana',
+    ];
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.settings),
+                  SizedBox(width: 10),
+                  Text('Tayyib Word Options'),
+                ],
+              ),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: availableFonts.contains(selectedFont)
+                          ? selectedFont
+                          : availableFonts.first,
+                      decoration: const InputDecoration(
+                        labelText: 'Default Font',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: availableFonts
+                          .map(
+                            (font) => DropdownMenuItem<String>(
+                              value: font,
+                              child: Text(
+                                font,
+                                style: TextStyle(fontFamily: font),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() {
+                          selectedFont = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    DropdownButtonFormField<double>(
+                      initialValue: selectedSize,
+                      decoration: const InputDecoration(
+                        labelText: 'Default Font Size',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 9, child: Text('9')),
+                        DropdownMenuItem(value: 10, child: Text('10')),
+                        DropdownMenuItem(value: 11, child: Text('11')),
+                        DropdownMenuItem(value: 12, child: Text('12')),
+                        DropdownMenuItem(value: 14, child: Text('14')),
+                        DropdownMenuItem(value: 16, child: Text('16')),
+                        DropdownMenuItem(value: 18, child: Text('18')),
+                        DropdownMenuItem(value: 20, child: Text('20')),
+                        DropdownMenuItem(value: 24, child: Text('24')),
+                        DropdownMenuItem(value: 28, child: Text('28')),
+                        DropdownMenuItem(value: 32, child: Text('32')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() {
+                          selectedSize = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'These settings will be used as the editor defaults.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _fontName = selectedFont;
+                      _fontSize = selectedSize;
+                      _fontNameController.text = selectedFont;
+                      _fontSizeController.text = selectedSize
+                          .toInt()
+                          .toString();
+                    });
+
+                    Navigator.pop(dialogContext);
+                    _showMessage('Options saved.');
+                  },
+                  icon: const Icon(Icons.check),
+                  label: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showMessage(String message) {
@@ -575,6 +1981,22 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     );
   }
 
+  void _toggleFormatPainter() {
+    setState(() {
+      if (!_formatPainterActive) {
+        _formatPainterActive = true;
+      } else {
+        _formatPainterActive = false;
+      }
+    });
+
+    _showMessage(
+      _formatPainterActive
+          ? 'Format Painter: formatting captured'
+          : 'Format Painter: Off',
+    );
+  }
+
   void _undo() {
     _showMessage('Undo is available from the editor history.');
   }
@@ -584,21 +2006,42 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _toggleBold() {
+    final attrs = _quillController.getSelectionStyle().attributes;
+    final attribute = attrs.containsKey(quill.Attribute.bold.key)
+        ? quill.Attribute.clone(quill.Attribute.bold, null)
+        : quill.Attribute.bold;
+
     setState(() {
-      _isBold = !_isBold;
+      _isBold = !attrs.containsKey(quill.Attribute.bold.key);
     });
+
+    _quillController.formatSelection(attribute);
   }
 
   void _toggleItalic() {
+    final attrs = _quillController.getSelectionStyle().attributes;
+    final attribute = attrs.containsKey(quill.Attribute.italic.key)
+        ? quill.Attribute.clone(quill.Attribute.italic, null)
+        : quill.Attribute.italic;
+
     setState(() {
-      _isItalic = !_isItalic;
+      _isItalic = !attrs.containsKey(quill.Attribute.italic.key);
     });
+
+    _quillController.formatSelection(attribute);
   }
 
   void _toggleUnderline() {
+    final attrs = _quillController.getSelectionStyle().attributes;
+    final attribute = attrs.containsKey(quill.Attribute.underline.key)
+        ? quill.Attribute.clone(quill.Attribute.underline, null)
+        : quill.Attribute.underline;
+
     setState(() {
-      _isUnderline = !_isUnderline;
+      _isUnderline = !attrs.containsKey(quill.Attribute.underline.key);
     });
+
+    _quillController.formatSelection(attribute);
   }
 
   void _findText() {
@@ -711,16 +2154,26 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _insertText(String value) {
-    final selection = _controller.selection;
+    if (value.isEmpty) return;
 
-    final start = selection.isValid ? selection.start : _controller.text.length;
-    final end = selection.isValid ? selection.end : start;
+    final selection = _quillController.selection;
+    final documentLength = _quillController.document.length;
 
-    final newText = _controller.text.replaceRange(start, end, value);
+    final start = selection.isValid
+        ? selection.start.clamp(0, documentLength - 1)
+        : documentLength - 1;
 
-    _controller.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: start + value.length),
+    final end = selection.isValid
+        ? selection.end.clamp(start, documentLength - 1)
+        : start;
+
+    final length = end - start;
+
+    _quillController.replaceText(
+      start,
+      length,
+      value,
+      TextSelection.collapsed(offset: start + value.length),
     );
   }
 
@@ -1116,44 +2569,90 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Header row'),
-                        value: headerRow,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            headerRow = value ?? true;
-                          });
-                        },
-                      ),
-                      DropdownButtonFormField<String>(
-                        initialValue: borderStyle,
-                        decoration: const InputDecoration(
-                          labelText: 'Border style',
-                          border: OutlineInputBorder(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Full',
-                            child: Text('Full borders'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Outer',
-                            child: Text('Outer border'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'None',
-                            child: Text('No borders'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setDialogState(() {
-                              borderStyle = value;
-                            });
-                          }
-                        },
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFD6D6D6)),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: headerRow,
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    onChanged: (value) {
+                                      setDialogState(() {
+                                        headerRow = value ?? true;
+                                      });
+                                    },
+                                  ),
+                                  const SizedBox(width: 2),
+                                  const Text(
+                                    'Header row',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 155,
+                              height: 38,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: borderStyle,
+                                isDense: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Borders',
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 8,
+                                  ),
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'Full',
+                                    child: Text(
+                                      'Full borders',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Outer',
+                                    child: Text(
+                                      'Outer border',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'None',
+                                    child: Text(
+                                      'No borders',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setDialogState(() {
+                                      borderStyle = value;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: 10),
                       const SizedBox(height: 12),
                       Container(
                         constraints: const BoxConstraints(maxHeight: 360),
@@ -1225,68 +2724,30 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                   icon: const Icon(Icons.table_chart),
                   label: const Text('Insert'),
                   onPressed: () {
-                    final buffer = StringBuffer();
-                    buffer.writeln();
+                    final tableCells = <List<String>>[
+                      for (var r = 0; r < rows; r++)
+                        [
+                          for (var c = 0; c < columns; c++)
+                            cells[r][c].text.trim(),
+                        ],
+                    ];
 
-                    for (var r = 0; r < rows; r++) {
-                      buffer.write('|');
+                    final tableEmbed = TayyibTableEmbed(
+                      rows: rows,
+                      columns: columns,
+                      headerRow: headerRow,
+                      borderStyle: borderStyle,
+                      cells: tableCells,
+                    );
 
-                      for (var c = 0; c < columns; c++) {
-                        var value = cells[r][c].text.trim();
+                    final insertOffset = _quillController.selection.start;
 
-                        if (value.isEmpty && r == 0 && headerRow) {
-                          value = 'Column ${c + 1}';
-                        }
+                    _quillController.document.insert(insertOffset, tableEmbed);
 
-                        if (value.isEmpty) {
-                          value = ' ';
-                        }
-
-                        buffer.write(' $value ');
-                        buffer.write('|');
-                      }
-
-                      buffer.writeln();
-
-                      if (r == 0 && headerRow && borderStyle != 'None') {
-                        buffer.write('|');
-
-                        for (var c = 0; c < columns; c++) {
-                          buffer.write('--------------|');
-                        }
-
-                        buffer.writeln();
-                      }
-                    }
-
-                    buffer.writeln();
-
-                    var tableText = buffer.toString();
-
-                    if (borderStyle == 'None') {
-                      tableText = tableText.replaceAll('|', '  ');
-                    } else if (borderStyle == 'Outer') {
-                      final lines = tableText.trimRight().split('\n');
-
-                      if (lines.length > 2) {
-                        final rebuilt = StringBuffer();
-
-                        for (var i = 0; i < lines.length; i++) {
-                          final line = lines[i];
-
-                          if (i == 1 && headerRow) {
-                            rebuilt.writeln(line);
-                            continue;
-                          }
-
-                          rebuilt.writeln(line);
-                        }
-
-                        tableText = rebuilt.toString();
-                      }
-                    }
-
-                    _insertText(tableText);
+                    _quillController.updateSelection(
+                      TextSelection.collapsed(offset: insertOffset + 1),
+                      quill.ChangeSource.local,
+                    );
 
                     for (final row in cells) {
                       for (final controller in row) {
@@ -1421,14 +2882,23 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                       width = width.clamp(50, 1000);
                       height = height.clamp(50, 1000);
 
-                      _insertText(
-                        '\n'
-                        '[Picture]\n'
-                        'File: ${file.name}\n'
-                        'Path: $path\n'
-                        'Size: ${width.round()} × ${height.round()} px\n'
-                        'Alignment: $alignment\n'
-                        '[/Picture]\n\n',
+                      final pictureEmbed = TayyibPictureEmbed(
+                        path: path,
+                        width: width,
+                        height: height,
+                        alignment: alignment,
+                      );
+
+                      final insertOffset = _quillController.selection.start;
+
+                      _quillController.document.insert(
+                        insertOffset,
+                        pictureEmbed,
+                      );
+
+                      _quillController.updateSelection(
+                        TextSelection.collapsed(offset: insertOffset + 1),
+                        quill.ChangeSource.local,
                       );
 
                       Navigator.pop(dialogContext);
@@ -1556,12 +3026,22 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                                         120;
                                     size = size.clamp(30, 600);
 
-                                    _insertText(
-                                      '\n'
-                                      '[Shape: ${shape['name']} ${shape['symbol']}]\n'
-                                      'Size: ${size.round()}\n'
-                                      'Alignment: $alignment\n'
-                                      '[/Shape]\n\n',
+                                    final shapeEmbed = TayyibShapeEmbed(
+                                      name: shape['name'] ?? 'Rectangle',
+                                      size: size,
+                                      alignment: alignment,
+                                    );
+                                    final insertOffset =
+                                        _quillController.selection.start;
+                                    _quillController.document.insert(
+                                      insertOffset,
+                                      shapeEmbed,
+                                    );
+                                    _quillController.updateSelection(
+                                      TextSelection.collapsed(
+                                        offset: insertOffset + 1,
+                                      ),
+                                      quill.ChangeSource.local,
                                     );
 
                                     Navigator.pop(dialogContext);
@@ -1604,7 +3084,9 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
   void _showChart() {
     var chartType = 'Column';
+
     final titleController = TextEditingController(text: 'My Chart');
+
     final dataController = TextEditingController(text: '12,28,20,35,24,42');
 
     showDialog<void>(
@@ -1653,9 +3135,12 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                     TextField(
                       controller: dataController,
                       maxLines: 3,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'Data values',
-                        hintText: 'Example: 12,28,20,35,24,42',
+                        hintText: '12,28,20,35,24,42',
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -1664,7 +3149,9 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton.icon(
@@ -1684,6 +3171,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
                     for (final raw in rawValues) {
                       final value = double.tryParse(raw);
+
                       if (value != null) {
                         values.add(value);
                       }
@@ -1694,30 +3182,24 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                       return;
                     }
 
-                    final preview = StringBuffer();
+                    final chartEmbed = TayyibChartEmbed(
+                      chartType: chartType,
+                      title: title,
+                      values: values,
+                    );
 
-                    for (var i = 0; i < values.length; i++) {
-                      final value = values[i];
-                      final bars = value.clamp(0, 40).round();
-                      preview.writeln(
-                        'Item ${i + 1}: '
-                        '${'█' * bars} ${value.toStringAsFixed(0)}',
-                      );
-                    }
+                    final offset = _quillController.selection.start;
 
-                    _insertText(
-                      '\n'
-                      '[Chart: $chartType]\n'
-                      'Title: $title\n'
-                      'Data: ${values.join(', ')}\n'
-                      '${preview.toString()}'
-                      '[/Chart]\n\n',
+                    _quillController.document.insert(offset, chartEmbed);
+
+                    _quillController.updateSelection(
+                      TextSelection.collapsed(offset: offset + 1),
+                      quill.ChangeSource.local,
                     );
 
                     Navigator.pop(dialogContext);
-                    _showMessage(
-                      '$chartType chart inserted with ${values.length} values.',
-                    );
+
+                    _showMessage('$chartType chart inserted.');
                   },
                 ),
               ],
@@ -1726,9 +3208,6 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         );
       },
     );
-
-    titleController.dispose();
-    dataController.dispose();
   }
 
   void _insertPageBreak() {
@@ -1789,9 +3268,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
               item(Icons.save_as, 'Save As', _saveAsDialog),
               item(Icons.print, 'Print', _printDocument),
               const Divider(height: 1),
-              item(Icons.settings, 'Options', () {
-                _showMessage('Options');
-              }),
+              item(Icons.settings, 'Options', _showOptionsDialog),
               const SizedBox(height: 8),
             ],
           ),
@@ -1903,10 +3380,16 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         child: Row(
           children: [
             _buildRibbonGroup('Clipboard', [
-              _bigRibbonButton(Icons.content_cut, 'Cut', _cutText),
-              _bigRibbonButton(Icons.copy, 'Copy', _copyText),
-              _bigRibbonButton(Icons.paste, 'Paste', _pasteText),
-              _bigRibbonButton(Icons.select_all, 'Select All', _selectAll),
+              _smallRibbonButton(Icons.content_cut, 'Cut', _cutText),
+              _smallRibbonButton(Icons.copy, 'Copy', _copyText),
+              _smallRibbonButton(Icons.paste, 'Paste', _pasteText),
+              _smallRibbonButton(Icons.select_all, 'Select All', _selectAll),
+              _smallRibbonButton(
+                Icons.format_paint,
+                'Format Painter',
+                _toggleFormatPainter,
+                active: _formatPainterActive,
+              ),
             ]),
             _buildRibbonGroup('Font', [
               _fontControls(),
@@ -2276,11 +3759,20 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
             shrinkWrap: true,
             children: values.map((value) {
               return ListTile(
+                leading: const Icon(Icons.format_line_spacing),
                 title: Text('Line spacing ${value.toString()}'),
+                trailing: _lineSpacing == value
+                    ? const Icon(Icons.check)
+                    : null,
                 onTap: () {
                   setState(() {
                     _lineSpacing = value;
                   });
+
+                  _quillController.formatSelection(
+                    quill.LineHeightAttribute(lineHeight: value),
+                  );
+
                   Navigator.pop(sheetContext);
                   _showMessage('Line spacing: ${value.toString()}');
                 },
@@ -2433,10 +3925,18 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                   return;
                 }
 
-                _insertText(
-                  '\n┌──────────────────────────────┐\n'
-                  '│ $value\n'
-                  '└──────────────────────────────┘\n\n',
+                final textBoxEmbed = TayyibTextBoxEmbed(
+                  text: value,
+                  style: 'Simple',
+                );
+
+                final insertOffset = _quillController.selection.start;
+
+                _quillController.document.insert(insertOffset, textBoxEmbed);
+
+                _quillController.updateSelection(
+                  TextSelection.collapsed(offset: insertOffset + 1),
+                  quill.ChangeSource.local,
                 );
 
                 Navigator.pop(dialogContext);
@@ -2516,7 +4016,22 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                       return;
                     }
 
-                    _insertText('\n★ WORDART [$selectedStyle]: $value ★\n\n');
+                    final wordArtEmbed = TayyibWordArtEmbed(
+                      text: value,
+                      style: selectedStyle,
+                    );
+
+                    final insertOffset = _quillController.selection.start;
+
+                    _quillController.document.insert(
+                      insertOffset,
+                      wordArtEmbed,
+                    );
+
+                    _quillController.updateSelection(
+                      TextSelection.collapsed(offset: insertOffset + 1),
+                      quill.ChangeSource.local,
+                    );
 
                     Navigator.pop(dialogContext);
                     _showMessage('WordArt inserted');
@@ -2857,11 +4372,23 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                       return;
                     }
 
-                    _insertText(
-                      '\n'
-                      '[Equation]\n'
-                      '$value\n'
-                      '[/Equation]\n',
+                    final equationEmbed = TayyibEquationEmbed(
+                      expression: value,
+                      numerator: fractionN,
+                      denominator: fractionD,
+                    );
+
+                    final selection = _quillController.selection;
+                    final index = selection.baseOffset.clamp(
+                      0,
+                      _quillController.document.length - 1,
+                    );
+
+                    _quillController.document.insert(index, equationEmbed);
+
+                    _quillController.updateSelection(
+                      TextSelection.collapsed(offset: index + 1),
+                      quill.ChangeSource.local,
                     );
 
                     Navigator.pop(dialogContext);
@@ -3159,29 +4686,43 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _showThemeFonts() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final font in [
-            'Office',
-            'Calibri',
-            'Arial',
-            'Cambria',
-            'Times New Roman',
-            'Georgia',
-            'Verdana',
-          ])
-            ListTile(
-              leading: const Icon(Icons.text_fields),
-              title: Text(font),
-              onTap: () {
-                setState(() => _fontSetName = font);
-                Navigator.pop(context);
-              },
-            ),
-        ],
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final font in [
+              'Office',
+              'Calibri',
+              'Arial',
+              'Cambria',
+              'Times New Roman',
+              'Georgia',
+              'Verdana',
+            ])
+              ListTile(
+                leading: const Icon(Icons.text_fields),
+                title: Text(font),
+                trailing: _fontSetName == font ? const Icon(Icons.check) : null,
+                onTap: () {
+                  setState(() {
+                    _fontSetName = font;
+                  });
+
+                  _quillController.formatSelection(
+                    quill.Attribute.fromKeyValue(
+                      quill.Attribute.font.key,
+                      font,
+                    ),
+                  );
+
+                  Navigator.pop(sheetContext);
+                  _showMessage('Theme font: $font');
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -3219,30 +4760,69 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _showOrientation() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.stay_current_portrait),
-            title: const Text('Portrait'),
-            onTap: () {
-              setState(() => _landscape = false);
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.stay_current_landscape),
-            title: const Text('Landscape'),
-            onTap: () {
-              setState(() => _landscape = true);
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
+    final renderObject = context.findRenderObject();
+
+    if (renderObject is! RenderBox) {
+      return;
+    }
+
+    final offset = renderObject.localToGlobal(
+      renderObject.size.bottomRight(Offset.zero),
     );
+
+    final screenSize = MediaQuery.sizeOf(context);
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        offset.dx.clamp(8.0, screenSize.width - 190.0),
+        (offset.dy - 120.0).clamp(8.0, screenSize.height - 150.0),
+        12.0,
+        0.0,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'Portrait',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.stay_current_portrait,
+                size: 20,
+                color: _landscape
+                    ? Colors.black87
+                    : Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              const Text('Portrait'),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'Landscape',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.stay_current_landscape,
+                size: 20,
+                color: _landscape
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.black87,
+              ),
+              const SizedBox(width: 10),
+              const Text('Landscape'),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'Portrait') {
+        setState(() => _landscape = false);
+      } else if (value == 'Landscape') {
+        setState(() => _landscape = true);
+      }
+    });
   }
 
   void _showPageSize() {
@@ -3266,23 +4846,53 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _showColumns() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final count in [1, 2, 3])
-            ListTile(
-              leading: const Icon(Icons.view_column),
-              title: Text('$count Column${count == 1 ? '' : 's'}'),
-              onTap: () {
-                setState(() => _columns = count);
-                Navigator.pop(context);
-              },
-            ),
-        ],
-      ),
+    final renderObject = context.findRenderObject();
+
+    if (renderObject is! RenderBox) {
+      return;
+    }
+
+    final offset = renderObject.localToGlobal(
+      renderObject.size.bottomRight(Offset.zero),
     );
+
+    final screenSize = MediaQuery.sizeOf(context);
+
+    showMenu<int>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        offset.dx.clamp(8.0, screenSize.width - 180.0),
+        (offset.dy - 170.0).clamp(8.0, screenSize.height - 190.0),
+        12.0,
+        0.0,
+      ),
+      items: [
+        for (final count in [1, 2, 3, 4])
+          PopupMenuItem<int>(
+            value: count,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.view_column,
+                  size: 20,
+                  color: _columns == count
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.black87,
+                ),
+                const SizedBox(width: 10),
+                Text('$count Column${count == 1 ? '' : 's'}'),
+              ],
+            ),
+          ),
+      ],
+    ).then((value) {
+      if (value != null) {
+        setState(() {
+          _columns = value;
+        });
+      }
+    });
   }
 
   void _showWatermark() {
@@ -4468,32 +6078,65 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: 112,
+          width: 150,
           height: 32,
-          child: DropdownButtonFormField<String>(
-            initialValue: fonts.contains(_fontName) ? _fontName : fonts.first,
-            isDense: true,
-            decoration: const InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 6),
-              border: OutlineInputBorder(),
-            ),
-            items: fonts
-                .map(
-                  (font) => DropdownMenuItem<String>(
-                    value: font,
-                    child: Text(
-                      font,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontFamily: font, fontSize: 12),
+          child: TextField(
+            controller: _fontNameController,
+            style: const TextStyle(fontSize: 12),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              border: const OutlineInputBorder(),
+              suffixIcon: PopupMenuButton<String>(
+                icon: const Icon(Icons.arrow_drop_down, size: 20),
+                padding: EdgeInsets.zero,
+                onSelected: (value) {
+                  _fontNameController.text = value;
+                  _fontNameController.selection = TextSelection.collapsed(
+                    offset: value.length,
+                  );
+
+                  setState(() {
+                    _fontName = value;
+                  });
+
+                  _quillController.formatSelection(
+                    quill.Attribute.fromKeyValue(
+                      quill.Attribute.font.key,
+                      value,
                     ),
-                  ),
-                )
-                .toList(),
+                  );
+                },
+                itemBuilder: (context) {
+                  return fonts
+                      .map(
+                        (font) => PopupMenuItem<String>(
+                          value: font,
+                          child: Text(
+                            font,
+                            style: TextStyle(fontFamily: font, fontSize: 13),
+                          ),
+                        ),
+                      )
+                      .toList();
+                },
+              ),
+            ),
             onChanged: (value) {
-              if (value == null) return;
               setState(() {
                 _fontName = value;
               });
+            },
+            onSubmitted: (value) {
+              final font = value.trim();
+              if (font.isEmpty) return;
+
+              setState(() {
+                _fontName = font;
+              });
+
+              _quillController.formatSelection(
+                quill.Attribute.fromKeyValue(quill.Attribute.font.key, font),
+              );
             },
           ),
         ),
@@ -4501,29 +6144,63 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         SizedBox(
           width: 58,
           height: 32,
-          child: DropdownButtonFormField<double>(
-            initialValue: sizes.contains(_fontSize) ? _fontSize : 11,
-            isDense: true,
-            decoration: const InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 6),
-              border: OutlineInputBorder(),
-            ),
-            items: sizes
-                .map(
-                  (size) => DropdownMenuItem<double>(
-                    value: size,
-                    child: Text(
-                      size.toInt().toString(),
-                      style: const TextStyle(fontSize: 12),
+          child: TextField(
+            controller: _fontSizeController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontSize: 12),
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              border: const OutlineInputBorder(),
+              suffixIcon: PopupMenuButton<double>(
+                icon: const Icon(Icons.arrow_drop_down, size: 18),
+                padding: EdgeInsets.zero,
+                onSelected: (value) {
+                  _fontSizeController.text = value.toInt().toString();
+                  _fontSizeController.selection = TextSelection.collapsed(
+                    offset: _fontSizeController.text.length,
+                  );
+
+                  setState(() {
+                    _fontSize = value;
+                  });
+
+                  _quillController.formatSelection(
+                    quill.Attribute.fromKeyValue(
+                      quill.Attribute.size.key,
+                      value.toString(),
                     ),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value == null) return;
+                  );
+                },
+                itemBuilder: (context) {
+                  return sizes
+                      .map(
+                        (size) => PopupMenuItem<double>(
+                          value: size,
+                          child: Text(size.toInt().toString()),
+                        ),
+                      )
+                      .toList();
+                },
+              ),
+            ),
+            onSubmitted: (value) {
+              final size = double.tryParse(value.trim());
+              if (size == null || size <= 0) {
+                _fontSizeController.text = _fontSize.toInt().toString();
+                return;
+              }
+
               setState(() {
-                _fontSize = value;
+                _fontSize = size;
               });
+
+              _quillController.formatSelection(
+                quill.Attribute.fromKeyValue(
+                  quill.Attribute.size.key,
+                  size.toString(),
+                ),
+              );
             },
           ),
         ),
@@ -4617,6 +6294,80 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     );
   }
 
+  Widget _buildColumnLayout({
+    required double contentWidth,
+    required double contentHeight,
+  }) {
+    final int count = _columns.clamp(1, 4);
+
+    final double gap = count == 1 ? 0 : 18;
+    final double columnWidth = (contentWidth - (gap * (count - 1))) / count;
+
+    final editor = quill.QuillEditor.basic(
+      controller: _quillController,
+      config: quill.QuillEditorConfig(
+        padding: EdgeInsets.zero,
+        autoFocus: false,
+        expands: false,
+        scrollable: true,
+        enableInteractiveSelection: true,
+        enableSelectionToolbar: true,
+        placeholder: 'Start typing...',
+        embedBuilders: [
+          TayyibTableEmbedBuilder(),
+          TayyibTextBoxEmbedBuilder(),
+          TayyibWordArtEmbedBuilder(),
+          TayyibPictureEmbedBuilder(),
+          TayyibShapeEmbedBuilder(),
+          TayyibChartEmbedBuilder(),
+          TayyibEquationEmbedBuilder(),
+        ],
+      ),
+    );
+
+    if (count == 1) {
+      return SizedBox(
+        width: contentWidth,
+        height: contentHeight,
+        child: editor,
+      );
+    }
+
+    return SizedBox(
+      width: contentWidth,
+      height: contentHeight,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (int i = 0; i < count; i++) ...[
+            SizedBox(
+              width: columnWidth,
+              height: contentHeight,
+              child: i == 0
+                  ? editor
+                  : Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.transparent,
+                      ),
+                    ),
+            ),
+            if (i < count - 1)
+              SizedBox(
+                width: gap,
+                child: Center(
+                  child: Container(
+                    width: 1,
+                    height: contentHeight,
+                    color: const Color(0xFFD6D6D6),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildEditor() {
     final bool webLayout = _viewMode == 'Web Layout';
 
@@ -4689,39 +6440,9 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
               _marginRight,
               _marginBottom,
             ),
-            child: SizedBox(
-              width: contentWidth,
-              height: contentHeight,
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                expands: false,
-                keyboardType: TextInputType.multiline,
-                textAlign: TextAlign.left,
-                textAlignVertical: TextAlignVertical.top,
-                style: TextStyle(
-                  fontFamily: _fontSetName == 'Office'
-                      ? _fontName
-                      : _fontSetName == 'Classic'
-                      ? 'Times New Roman'
-                      : _fontSetName == 'Modern'
-                      ? 'Arial'
-                      : _fontSetName == 'Simple'
-                      ? 'Roboto'
-                      : _fontName,
-                  fontSize: _fontSize,
-                  fontWeight: _isBold ? FontWeight.bold : FontWeight.normal,
-                  fontStyle: _isItalic ? FontStyle.italic : FontStyle.normal,
-                  decoration: _isUnderline
-                      ? TextDecoration.underline
-                      : TextDecoration.none,
-                  height: _lineSpacing,
-                ),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  isCollapsed: true,
-                ),
-              ),
+            child: _buildColumnLayout(
+              contentWidth: contentWidth,
+              contentHeight: contentHeight,
             ),
           ),
 
