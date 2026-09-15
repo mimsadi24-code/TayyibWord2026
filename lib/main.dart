@@ -1009,7 +1009,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
     const initialText =
         'Welcome to Tayyib Word\n\n'
-        'This is your document. Start typing here...';
+        'This is your document. Start typing here...\n';
 
     _controller.text = initialText;
     _fontNameController.text = _fontName;
@@ -1143,10 +1143,11 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
       }
 
       final safeText = contents;
+      final quillText = safeText.endsWith('\n') ? safeText : '$safeText\n';
 
       _quillController = quill.QuillController(
         document: quill.Document.fromJson([
-          {'insert': safeText.isEmpty ? '\n' : safeText},
+          {'insert': quillText},
         ]),
         selection: const TextSelection.collapsed(offset: 0),
       );
