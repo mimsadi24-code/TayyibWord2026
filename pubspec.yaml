@@ -15,6 +15,7 @@ dependencies:
   pdf: ^3.13.0
   printing: ^5.15.0
   archive: ^4.0.9
+  flutter_quill: ^11.5.1
 
 dev_dependencies:
   flutter_test:
