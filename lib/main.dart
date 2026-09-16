@@ -942,6 +942,193 @@ class TayyibWordApp extends StatelessWidget {
   }
 }
 
+
+class _TayyibPageBackgroundPainter extends CustomPainter {
+  final double pageWidth;
+  final double pageHeight;
+  final double zoom;
+  final bool webLayout;
+  final Color pageColor;
+  final String pageBorderStyle;
+  final bool showGridlines;
+  final String watermark;
+
+  _TayyibPageBackgroundPainter({
+    required this.pageWidth,
+    required this.pageHeight,
+    required this.zoom,
+    required this.webLayout,
+    required this.pageColor,
+    required this.pageBorderStyle,
+    required this.showGridlines,
+    required this.watermark,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double scaledPageHeight = pageHeight * zoom;
+    final double scaledPageWidth = pageWidth * zoom;
+
+    if (scaledPageHeight <= 0 || scaledPageWidth <= 0) {
+      return;
+    }
+
+    final int pageCount =
+        math.max(1, (size.height / scaledPageHeight).ceil());
+
+    for (int page = 0; page < pageCount; page++) {
+      final double top = page * scaledPageHeight;
+
+      final Rect pageRect = Rect.fromLTWH(
+        0,
+        top,
+        math.min(scaledPageWidth, size.width),
+        scaledPageHeight,
+      );
+
+      final Paint pagePaint = Paint()
+        ..color = webLayout
+            ? const Color(0xFFF8F9FA)
+            : pageColor;
+
+      canvas.drawRect(pageRect, pagePaint);
+
+      // Visible page separation in Print Layout.
+      // The document remains one continuous Quill document, while each
+      // physical page gets a clear boundary and subtle separation.
+      if (!webLayout && page < pageCount - 1) {
+        final double boundaryY = pageRect.bottom;
+
+        final Paint separatorShadow = Paint()
+          ..color = Colors.black.withValues(alpha: .12)
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            4,
+          );
+
+        canvas.drawRect(
+          Rect.fromLTWH(
+            pageRect.left,
+            boundaryY - 1,
+            pageRect.width,
+            3,
+          ),
+          separatorShadow,
+        );
+
+        final Paint separatorPaint = Paint()
+          ..color = const Color(0xFFE0E0E0);
+
+        canvas.drawRect(
+          Rect.fromLTWH(
+            pageRect.left,
+            boundaryY,
+            pageRect.width,
+            8,
+          ),
+          separatorPaint,
+        );
+      }
+
+      if (!webLayout) {
+        final Paint shadowPaint = Paint()
+          ..color = Colors.black.withValues(alpha: .10)
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            5,
+          );
+
+        canvas.drawRect(
+          pageRect.shift(const Offset(0, 2)),
+          shadowPaint,
+        );
+
+        if (pageBorderStyle != 'None') {
+          final Paint borderPaint = Paint()
+            ..style = PaintingStyle.stroke
+            ..color = pageBorderStyle == '3-D'
+                ? Colors.black54
+                : pageBorderStyle == 'Shadow'
+                    ? Colors.grey.shade400
+                    : Colors.grey.shade600
+            ..strokeWidth = pageBorderStyle == '3-D' ? 2 : 1;
+
+          canvas.drawRect(pageRect, borderPaint);
+        }
+      }
+
+      if (showGridlines && !webLayout) {
+        final Paint gridPaint = Paint()
+          ..color = Colors.grey.withValues(alpha: .13)
+          ..strokeWidth = .5;
+
+        const double interval = 24;
+
+        for (double x = 0; x <= pageRect.width; x += interval) {
+          canvas.drawLine(
+            Offset(pageRect.left + x, pageRect.top),
+            Offset(pageRect.left + x, pageRect.bottom),
+            gridPaint,
+          );
+        }
+
+        for (double y = 0; y <= pageRect.height; y += interval) {
+          canvas.drawLine(
+            Offset(pageRect.left, pageRect.top + y),
+            Offset(pageRect.right, pageRect.top + y),
+            gridPaint,
+          );
+        }
+      }
+
+      if (watermark.isNotEmpty && !webLayout) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: watermark,
+            style: TextStyle(
+              fontSize: 42 * zoom,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.withValues(alpha: .20),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+
+        textPainter.layout();
+
+        canvas.save();
+        canvas.translate(
+          pageRect.center.dx,
+          pageRect.center.dy,
+        );
+        canvas.rotate(-0.55);
+
+        textPainter.paint(
+          canvas,
+          Offset(
+            -textPainter.width / 2,
+            -textPainter.height / 2,
+          ),
+        );
+
+        canvas.restore();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TayyibPageBackgroundPainter oldDelegate) {
+    return oldDelegate.pageWidth != pageWidth ||
+        oldDelegate.pageHeight != pageHeight ||
+        oldDelegate.zoom != zoom ||
+        oldDelegate.webLayout != webLayout ||
+        oldDelegate.pageColor != pageColor ||
+        oldDelegate.pageBorderStyle != pageBorderStyle ||
+        oldDelegate.showGridlines != showGridlines ||
+        oldDelegate.watermark != watermark;
+  }
+}
+
 class WordEditorScreen extends StatefulWidget {
   const WordEditorScreen({super.key});
 
@@ -951,10 +1138,11 @@ class WordEditorScreen extends StatefulWidget {
 
 class _WordEditorScreenState extends State<WordEditorScreen> {
   final TextEditingController _controller = TextEditingController();
-  late final quill.QuillController _quillController;
+  late quill.QuillController _quillController;
 
   String _currentFileName = 'Document1.txt';
   String _activeTab = 'Home';
+  int _currentPage = 1;
 
   bool _isBold = false;
   bool _isItalic = false;
@@ -1070,10 +1258,26 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _newDocument() {
+    _quillController.document = quill.Document.fromJson([
+      {'insert': '\n'},
+    ]);
+
+    _controller.value = const TextEditingValue(
+      text: '',
+      selection: TextSelection.collapsed(offset: 0),
+    );
+
     setState(() {
-      _controller.clear();
       _currentFileName = 'Document1.txt';
+      _isBold = false;
+      _isItalic = false;
+      _isUnderline = false;
+      _isStrikethrough = false;
+      _isSuperscript = false;
+      _isSubscript = false;
     });
+
+    _updateWordCount();
   }
 
   Future<void> _openFile() async {
@@ -1999,11 +2203,15 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
   }
 
   void _undo() {
-    _showMessage('Undo is available from the editor history.');
+    if (_quillController.hasUndo) {
+      _quillController.undo();
+    }
   }
 
   void _redo() {
-    _showMessage('Redo is available from the editor history.');
+    if (_quillController.hasRedo) {
+      _quillController.redo();
+    }
   }
 
   void _toggleBold() {
@@ -2137,12 +2345,61 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
                 final replacement = replaceController.text;
 
-                setState(() {
-                  _controller.text = _controller.text.replaceAll(
-                    find,
-                    replacement,
+                final documentText =
+                    _quillController.document.toPlainText();
+
+                final lowerDocument = documentText.toLowerCase();
+                final lowerFind = find.toLowerCase();
+
+                var searchFrom = 0;
+                var replacements = 0;
+
+                while (true) {
+                  final index = lowerDocument.indexOf(
+                    lowerFind,
+                    searchFrom,
                   );
-                });
+
+                  if (index < 0) {
+                    break;
+                  }
+
+                  _quillController.replaceText(
+                    index,
+                    find.length,
+                    replacement,
+                    TextSelection.collapsed(
+                      offset: index + replacement.length,
+                    ),
+                  );
+
+                  replacements++;
+                  searchFrom = index + replacement.length;
+
+                  final updatedText =
+                      _quillController.document.toPlainText();
+
+                  if (searchFrom > updatedText.length) {
+                    break;
+                  }
+
+                  final nextIndex = updatedText.toLowerCase().indexOf(
+                    lowerFind,
+                    searchFrom,
+                  );
+
+                  if (nextIndex < 0) {
+                    break;
+                  }
+
+                  searchFrom = nextIndex;
+                }
+
+                _showMessage(
+                  replacements == 0
+                      ? 'Text not found.'
+                      : 'Replaced $replacements occurrence(s).',
+                );
 
                 Navigator.pop(context);
               },
@@ -6295,74 +6552,316 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     );
   }
 
+
+  /// Step 16C foundation:
+  /// Calculates the printable width available to each column.
+  /// The Quill document remains a single source of truth.
+  /// Actual cursor/selection editing stays in the primary editor.
+  int _calculateDocumentPageCount({
+    required String plainText,
+    required double pageWidth,
+    required double pageHeight,
+    required double contentWidth,
+    required double contentHeight,
+    required bool webLayout,
+  }) {
+    if (webLayout) {
+      return 1;
+    }
+
+    final String normalized = plainText.replaceAll('\r\n', '\n');
+    final List<String> paragraphs = normalized.split('\n');
+
+    final double fontHeight = math.max(14.0, _fontSize * 1.25);
+    final double usableHeight = math.max(200.0, contentHeight);
+    final double usableWidth = math.max(120.0, contentWidth);
+
+    int estimatedLines = 0;
+
+    for (final paragraph in paragraphs) {
+      if (paragraph.isEmpty) {
+        estimatedLines += 1;
+        continue;
+      }
+
+      final int charsPerLine =
+          math.max(8, (usableWidth / math.max(5.0, _fontSize * 0.55)).floor());
+
+      estimatedLines += math.max(
+        1,
+        (paragraph.length / charsPerLine).ceil(),
+      );
+    }
+
+    final int linesPerPage =
+        math.max(1, (usableHeight / fontHeight).floor());
+
+    final int estimatedPages =
+        math.max(1, (estimatedLines / linesPerPage).ceil());
+
+    return estimatedPages;
+  }
+
+  List<double> _calculateColumnWidths(double contentWidth) {
+    final int count = _columns.clamp(1, 4);
+
+    final double gap = switch (count) {
+      1 => 0.0,
+      2 => 24.0,
+      3 => 18.0,
+      _ => 14.0,
+    };
+
+    final double width = math.max(
+      80.0,
+      (contentWidth - gap * (count - 1)) / count,
+    );
+
+    return List<double>.filled(count, width);
+  }
+
+  final List<quill.QuillController> _columnControllers = <quill.QuillController>[];
+  bool _syncingColumnEditors = false;
+
+  void _disposeColumnControllers() {
+    for (final controller in _columnControllers) {
+      controller.dispose();
+    }
+    _columnControllers.clear();
+  }
+
+  String _columnPlainText(quill.QuillController controller) {
+    return controller.document.toPlainText().replaceFirst(RegExp(r'\n$'), '');
+  }
+
+  void _syncColumnsToMaster() {
+    if (_syncingColumnEditors || _columnControllers.isEmpty) {
+      return;
+    }
+
+    _syncingColumnEditors = true;
+
+    final String merged = _columnControllers
+        .map(_columnPlainText)
+        .join();
+
+    final String current =
+        _quillController.document.toPlainText().replaceFirst(RegExp(r'\n$'), '');
+
+    if (merged != current) {
+      _quillController.document = quill.Document.fromJson([
+        {'insert': merged.isEmpty ? '\n' : '$merged\n'},
+      ]);
+
+      _controller.text = merged;
+      _updateWordCount();
+    }
+
+    _syncingColumnEditors = false;
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _rebuildColumnEditors({
+    required List<String> parts,
+  }) {
+    _syncingColumnEditors = true;
+
+    _disposeColumnControllers();
+
+    for (final part in parts) {
+      final controller = quill.QuillController(
+        document: quill.Document.fromJson([
+          {'insert': part.isEmpty ? '\n' : '$part\n'},
+        ]),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+
+      controller.addListener(_syncColumnsToMaster);
+      _columnControllers.add(controller);
+    }
+
+    _syncingColumnEditors = false;
+  }
+
+  List<String> _splitTextForColumns({
+    required String source,
+    required int count,
+    required double columnWidth,
+    required double columnHeight,
+  }) {
+    if (source.isEmpty) {
+      return List<String>.filled(count, '');
+    }
+
+    final double fontSize = _fontSize.clamp(8.0, 96.0);
+    final double lineHeight =
+        math.max(12.0, fontSize * _lineSpacing * 1.45);
+    final double averageCharWidth =
+        math.max(4.0, fontSize * 0.52);
+
+    final int charsPerLine =
+        math.max(10, (columnWidth / averageCharWidth).floor());
+
+    final int linesPerColumn =
+        math.max(1, (columnHeight / lineHeight).floor());
+
+    final int capacity =
+        math.max(charsPerLine, charsPerLine * linesPerColumn);
+
+    final List<String> result = <String>[];
+
+    int cursor = 0;
+
+    while (cursor < source.length) {
+      int end = math.min(source.length, cursor + capacity);
+
+      if (end < source.length) {
+        final int newline =
+            source.lastIndexOf('\n', end - 1);
+        final int space =
+            source.lastIndexOf(' ', end - 1);
+
+        final int boundary =
+            math.max(newline, space);
+
+        if (boundary >
+            cursor + math.max(1, (capacity * 0.55).floor())) {
+          end = boundary + 1;
+        }
+      }
+
+      if (end <= cursor) {
+        end = math.min(source.length, cursor + capacity);
+      }
+
+      result.add(source.substring(cursor, end));
+      cursor = end;
+    }
+
+    while (result.length < count) {
+      result.add('');
+    }
+
+    return result;
+  }
+
+  Widget _buildColumnEditor(
+    quill.QuillController controller,
+    double width,
+    double height,
+  ) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: quill.QuillEditor.basic(
+        controller: controller,
+        config: quill.QuillEditorConfig(
+          padding: EdgeInsets.zero,
+          autoFocus: false,
+          expands: false,
+          scrollable: true,
+          enableInteractiveSelection: true,
+          enableSelectionToolbar: true,
+          placeholder: 'Start typing...',
+          embedBuilders: [
+            TayyibTableEmbedBuilder(),
+            TayyibTextBoxEmbedBuilder(),
+            TayyibWordArtEmbedBuilder(),
+            TayyibPictureEmbedBuilder(),
+            TayyibShapeEmbedBuilder(),
+            TayyibChartEmbedBuilder(),
+            TayyibEquationEmbedBuilder(),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildColumnLayout({
     required double contentWidth,
     required double contentHeight,
   }) {
     final int count = _columns.clamp(1, 4);
 
-    final double gap = count == 1 ? 0 : 18;
-    final double columnWidth = (contentWidth - (gap * (count - 1))) / count;
-
-    final editor = quill.QuillEditor.basic(
-      controller: _quillController,
-      config: quill.QuillEditorConfig(
-        padding: EdgeInsets.zero,
-        autoFocus: false,
-        expands: false,
-        scrollable: true,
-        enableInteractiveSelection: true,
-        enableSelectionToolbar: true,
-        placeholder: 'Start typing...',
-        embedBuilders: [
-          TayyibTableEmbedBuilder(),
-          TayyibTextBoxEmbedBuilder(),
-          TayyibWordArtEmbedBuilder(),
-          TayyibPictureEmbedBuilder(),
-          TayyibShapeEmbedBuilder(),
-          TayyibChartEmbedBuilder(),
-          TayyibEquationEmbedBuilder(),
-        ],
-      ),
-    );
-
     if (count == 1) {
+      _disposeColumnControllers();
+
       return SizedBox(
         width: contentWidth,
         height: contentHeight,
-        child: editor,
+        child: quill.QuillEditor.basic(
+          controller: _quillController,
+          config: quill.QuillEditorConfig(
+            padding: EdgeInsets.zero,
+            autoFocus: false,
+            expands: false,
+            scrollable: true,
+            enableInteractiveSelection: true,
+            enableSelectionToolbar: true,
+            placeholder: 'Start typing...',
+            embedBuilders: [
+              TayyibTableEmbedBuilder(),
+              TayyibTextBoxEmbedBuilder(),
+              TayyibWordArtEmbedBuilder(),
+              TayyibPictureEmbedBuilder(),
+              TayyibShapeEmbedBuilder(),
+              TayyibChartEmbedBuilder(),
+              TayyibEquationEmbedBuilder(),
+            ],
+          ),
+        ),
       );
+    }
+
+    final List<double> widths =
+        _calculateColumnWidths(contentWidth);
+
+    final double gap = switch (count) {
+      2 => 24.0,
+      3 => 18.0,
+      _ => 14.0,
+    };
+
+    final String source =
+        _quillController.document.toPlainText()
+            .replaceFirst(RegExp(r'\n$'), '');
+
+    final List<String> parts = _splitTextForColumns(
+      source: source,
+      count: count,
+      columnWidth: widths.first,
+      columnHeight: contentHeight,
+    );
+
+    final bool needsRebuild =
+        _columnControllers.length != count ||
+        _columnControllers.length != parts.length;
+
+    if (needsRebuild) {
+      _rebuildColumnEditors(parts: parts);
+    }
+
+    if (_columnControllers.length != count) {
+      return const SizedBox.shrink();
     }
 
     return SizedBox(
       width: contentWidth,
       height: contentHeight,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (int i = 0; i < count; i++) ...[
-            SizedBox(
-              width: columnWidth,
-              height: contentHeight,
-              child: i == 0
-                  ? editor
-                  : Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.transparent,
-                      ),
-                    ),
+            _buildColumnEditor(
+              _columnControllers[i],
+              widths[i],
+              contentHeight,
             ),
             if (i < count - 1)
-              SizedBox(
-                width: gap,
-                child: Center(
-                  child: Container(
-                    width: 1,
-                    height: contentHeight,
-                    color: const Color(0xFFD6D6D6),
-                  ),
-                ),
-              ),
+              SizedBox(width: gap),
           ],
         ],
       ),
@@ -6376,122 +6875,152 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     final double basePageHeight = _landscape ? 595.0 : 842.0;
 
     final double pageWidth = webLayout ? 900.0 : basePageWidth;
-
     final double pageHeight = webLayout ? 1100.0 : basePageHeight;
 
-    final double contentWidth = (pageWidth - _marginLeft - _marginRight).clamp(
-      120.0,
-      pageWidth,
+    final double contentWidth =
+        (pageWidth - _marginLeft - _marginRight)
+            .clamp(120.0, pageWidth);
+
+    final double contentHeight =
+        (pageHeight - _marginTop - _marginBottom)
+            .clamp(200.0, pageHeight);
+
+    // The document is now a continuous flow instead of one fixed page.
+    // We estimate a safe minimum number of pages from the current
+    // document length and allow the editor to grow naturally.
+    final String plainText = _quillController.document.toPlainText();
+
+    // Estimate wrapped lines from the actual printable width.
+    // This keeps pagination responsive to margins, orientation and font size.
+    final double safeFontSize =
+        _fontSize.clamp(8.0, 96.0);
+
+    final double averageCharWidth =
+        math.max(4.0, safeFontSize * 0.52);
+
+    final int charsPerLine = math.max(
+      8,
+      (contentWidth / averageCharWidth).floor(),
     );
 
-    final double contentHeight = (pageHeight - _marginTop - _marginBottom)
-        .clamp(200.0, pageHeight);
+    int lineEstimate = 0;
 
-    Border? pageBorder;
+    for (final String paragraph in plainText.split('\n')) {
+      final int length = paragraph.length;
 
-    switch (_pageBorderStyle) {
-      case 'Box':
-        pageBorder = Border.all(color: Colors.grey.shade600, width: 1);
-        break;
-      case 'Shadow':
-        pageBorder = Border.all(color: Colors.grey.shade400, width: 1);
-        break;
-      case '3-D':
-        pageBorder = Border.all(color: Colors.black54, width: 2);
-        break;
-      default:
-        pageBorder = null;
+      lineEstimate += math.max(
+        1,
+        (length / charsPerLine).ceil(),
+      );
     }
 
-    Widget documentPage = Container(
-      width: pageWidth,
-      constraints: BoxConstraints(minHeight: pageHeight),
-      decoration: BoxDecoration(
-        color: webLayout ? const Color(0xFFF8F9FA) : _pageColor,
-        border: pageBorder,
-        boxShadow: webLayout
-            ? const []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: .18),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-      ),
-      child: Stack(
-        children: [
-          if (_showGridlines && !webLayout)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: GridPaper(
-                  color: Colors.grey.withValues(alpha: .13),
-                  interval: 24,
-                  divisions: 4,
-                  subdivisions: 2,
-                  child: const SizedBox.expand(),
-                ),
+    final double estimatedLineHeight =
+        math.max(
+          12.0,
+          safeFontSize * _lineSpacing * 1.45,
+        );
+
+    final double estimatedContentHeight =
+        math.max(
+          contentHeight,
+          lineEstimate * estimatedLineHeight,
+        );
+
+    // Keep the document flow on whole-page boundaries.
+    // This preserves one Quill document while giving the page painter
+    // enough height to render consecutive A4/Letter-style pages cleanly.
+    final double usablePageHeight =
+        math.max(200.0, pageHeight - _marginTop - _marginBottom);
+
+    final int pageCount = math.max(
+      1,
+      (estimatedContentHeight / usablePageHeight).ceil(),
+    );
+
+    final double pageFlowHeight =
+        (pageCount * usablePageHeight) +
+        _marginTop +
+        _marginBottom;
+
+    // Keep a little breathing room between printed pages while the
+    // document is shown as one continuous scrollable surface.
+    final double pageGap = webLayout ? 0.0 : 24.0;
+
+    // Add the visual gap only in Print Layout.
+    // Web Layout remains a continuous document without page breaks.
+    final double documentFlowHeight =
+        pageFlowHeight +
+        (webLayout
+            ? 0.0
+            : math.max(0, pageCount - 1) * pageGap);
+
+    final double scaledPageWidth = pageWidth * _zoom;
+
+    Widget editorContent = SizedBox(
+      width: scaledPageWidth,
+      child: Transform.scale(
+        scale: _zoom,
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          width: pageWidth,
+          child: CustomPaint(
+            painter: _TayyibPageBackgroundPainter(
+              pageWidth: pageWidth,
+              pageHeight: pageHeight,
+              zoom: 1.0,
+              webLayout: webLayout,
+              pageColor: _pageColor,
+              pageBorderStyle: _pageBorderStyle,
+              showGridlines: _showGridlines,
+              watermark: _watermark,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: documentFlowHeight,
               ),
-            ),
-
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              _marginLeft,
-              _marginTop,
-              _marginRight,
-              _marginBottom,
-            ),
-            child: _buildColumnLayout(
-              contentWidth: contentWidth,
-              contentHeight: contentHeight,
-            ),
-          ),
-
-          if (_watermark.isNotEmpty && !webLayout)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Center(
-                  child: Transform.rotate(
-                    angle: -0.55,
-                    child: Text(
-                      _watermark,
-                      style: TextStyle(
-                        fontSize: 42,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.withValues(alpha: .20),
-                      ),
-                    ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  _marginLeft,
+                  _marginTop,
+                  _marginRight,
+                  _marginBottom,
+                ),
+                child: SizedBox(
+                  width: contentWidth,
+                  child: _buildColumnLayout(
+                    contentWidth: contentWidth,
+                    contentHeight: estimatedContentHeight,
                   ),
                 ),
               ),
             ),
-        ],
+          ),
+        ),
       ),
     );
 
-    documentPage = Transform.scale(
-      scale: _zoom,
-      alignment: Alignment.topCenter,
-      child: documentPage,
-    );
-
     Widget editorBody = Container(
-      color: webLayout ? const Color(0xFFF1F3F5) : const Color(0xFFD9D9D9),
+      color: webLayout
+          ? const Color(0xFFF1F3F5)
+          : const Color(0xFFD9D9D9),
       child: SingleChildScrollView(
         padding: EdgeInsets.only(
           top: webLayout ? 18 : 8,
-          bottom: 30,
+          bottom: 50,
           left: 12,
           right: 12,
         ),
         child: Column(
           children: [
             if (_showRuler)
-              _buildDocumentRuler(pageWidth: pageWidth, webLayout: webLayout),
-
+              _buildDocumentRuler(
+                pageWidth: pageWidth,
+                webLayout: webLayout,
+              ),
             const SizedBox(height: 6),
-
-            Center(child: documentPage),
+            Center(
+              child: editorContent,
+            ),
           ],
         ),
       ),
@@ -6503,16 +7032,21 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         child: Column(
           children: [
             if (_showRuler)
-              _buildDocumentRuler(pageWidth: pageWidth, webLayout: true),
+              _buildDocumentRuler(
+                pageWidth: pageWidth,
+                webLayout: true,
+              ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(
                   top: 8,
-                  bottom: 30,
+                  bottom: 50,
                   left: 12,
                   right: 12,
                 ),
-                child: Center(child: documentPage),
+                child: Center(
+                  child: editorContent,
+                ),
               ),
             ),
           ],
@@ -6520,7 +7054,73 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
       );
     }
 
-    return editorBody;
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (webLayout) {
+          if (_currentPage != 1 && mounted) {
+            setState(() {
+              _currentPage = 1;
+            });
+          }
+          return false;
+        }
+
+        if (notification.metrics.axis == Axis.vertical) {
+          final double pageExtent =
+              math.max(200.0, pageHeight - _marginTop - _marginBottom) +
+              pageGap;
+
+          final int calculatedPage =
+              ((notification.metrics.pixels / pageExtent).floor() + 1)
+                  .clamp(1, pageCount);
+
+          if (calculatedPage != _currentPage && mounted) {
+            setState(() {
+              _currentPage = calculatedPage;
+            });
+          }
+        }
+
+        return false;
+      },
+      child: Stack(
+        children: [
+          editorBody,
+          if (!webLayout)
+            Positioned(
+              right: 18,
+              bottom: 14,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: const [
+                    BoxShadow(
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                      color: Color(0x33000000),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    'Page $_currentPage of $pageCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDocumentRuler({
@@ -6589,9 +7189,41 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Row(
         children: [
-          const Text(
-            'Page 1',
-            style: TextStyle(color: Colors.white, fontSize: 11),
+          Builder(
+            builder: (context) {
+              final double pageHeight =
+                  _landscape ? 595.0 : 842.0;
+
+              final double contentHeight =
+                  (pageHeight - _marginTop - _marginBottom)
+                      .clamp(200.0, pageHeight);
+
+              final double contentWidth =
+                  ((_landscape ? 842.0 : 595.0) -
+                          _marginLeft -
+                          _marginRight)
+                      .clamp(
+                        120.0,
+                        _landscape ? 842.0 : 595.0,
+                      );
+
+              final int pages = _calculateDocumentPageCount(
+                plainText: _quillController.document.toPlainText(),
+                pageWidth: _landscape ? 842.0 : 595.0,
+                pageHeight: _landscape ? 595.0 : 842.0,
+                contentWidth: contentWidth,
+                contentHeight: contentHeight,
+                webLayout: _viewMode == 'Web Layout',
+              );
+
+              return Text(
+                'Page $_currentPage of $pages',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                ),
+              );
+            },
           ),
           const SizedBox(width: 18),
           Text(
