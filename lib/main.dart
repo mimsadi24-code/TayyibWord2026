@@ -942,7 +942,6 @@ class TayyibWordApp extends StatelessWidget {
   }
 }
 
-
 class _TayyibPageBackgroundPainter extends CustomPainter {
   final double pageWidth;
   final double pageHeight;
@@ -973,8 +972,7 @@ class _TayyibPageBackgroundPainter extends CustomPainter {
       return;
     }
 
-    final int pageCount =
-        math.max(1, (size.height / scaledPageHeight).ceil());
+    final int pageCount = math.max(1, (size.height / scaledPageHeight).ceil());
 
     for (int page = 0; page < pageCount; page++) {
       final double top = page * scaledPageHeight;
@@ -987,9 +985,7 @@ class _TayyibPageBackgroundPainter extends CustomPainter {
       );
 
       final Paint pagePaint = Paint()
-        ..color = webLayout
-            ? const Color(0xFFF8F9FA)
-            : pageColor;
+        ..color = webLayout ? const Color(0xFFF8F9FA) : pageColor;
 
       canvas.drawRect(pageRect, pagePaint);
 
@@ -1001,31 +997,17 @@ class _TayyibPageBackgroundPainter extends CustomPainter {
 
         final Paint separatorShadow = Paint()
           ..color = Colors.black.withValues(alpha: .12)
-          ..maskFilter = const MaskFilter.blur(
-            BlurStyle.normal,
-            4,
-          );
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
 
         canvas.drawRect(
-          Rect.fromLTWH(
-            pageRect.left,
-            boundaryY - 1,
-            pageRect.width,
-            3,
-          ),
+          Rect.fromLTWH(pageRect.left, boundaryY - 1, pageRect.width, 3),
           separatorShadow,
         );
 
-        final Paint separatorPaint = Paint()
-          ..color = const Color(0xFFE0E0E0);
+        final Paint separatorPaint = Paint()..color = const Color(0xFFE0E0E0);
 
         canvas.drawRect(
-          Rect.fromLTWH(
-            pageRect.left,
-            boundaryY,
-            pageRect.width,
-            8,
-          ),
+          Rect.fromLTWH(pageRect.left, boundaryY, pageRect.width, 8),
           separatorPaint,
         );
       }
@@ -1033,15 +1015,9 @@ class _TayyibPageBackgroundPainter extends CustomPainter {
       if (!webLayout) {
         final Paint shadowPaint = Paint()
           ..color = Colors.black.withValues(alpha: .10)
-          ..maskFilter = const MaskFilter.blur(
-            BlurStyle.normal,
-            5,
-          );
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
 
-        canvas.drawRect(
-          pageRect.shift(const Offset(0, 2)),
-          shadowPaint,
-        );
+        canvas.drawRect(pageRect.shift(const Offset(0, 2)), shadowPaint);
 
         if (pageBorderStyle != 'None') {
           final Paint borderPaint = Paint()
@@ -1049,8 +1025,8 @@ class _TayyibPageBackgroundPainter extends CustomPainter {
             ..color = pageBorderStyle == '3-D'
                 ? Colors.black54
                 : pageBorderStyle == 'Shadow'
-                    ? Colors.grey.shade400
-                    : Colors.grey.shade600
+                ? Colors.grey.shade400
+                : Colors.grey.shade600
             ..strokeWidth = pageBorderStyle == '3-D' ? 2 : 1;
 
           canvas.drawRect(pageRect, borderPaint);
@@ -1097,18 +1073,12 @@ class _TayyibPageBackgroundPainter extends CustomPainter {
         textPainter.layout();
 
         canvas.save();
-        canvas.translate(
-          pageRect.center.dx,
-          pageRect.center.dy,
-        );
+        canvas.translate(pageRect.center.dx, pageRect.center.dy);
         canvas.rotate(-0.55);
 
         textPainter.paint(
           canvas,
-          Offset(
-            -textPainter.width / 2,
-            -textPainter.height / 2,
-          ),
+          Offset(-textPainter.width / 2, -textPainter.height / 2),
         );
 
         canvas.restore();
@@ -2345,8 +2315,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
                 final replacement = replaceController.text;
 
-                final documentText =
-                    _quillController.document.toPlainText();
+                final documentText = _quillController.document.toPlainText();
 
                 final lowerDocument = documentText.toLowerCase();
                 final lowerFind = find.toLowerCase();
@@ -2355,10 +2324,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                 var replacements = 0;
 
                 while (true) {
-                  final index = lowerDocument.indexOf(
-                    lowerFind,
-                    searchFrom,
-                  );
+                  final index = lowerDocument.indexOf(lowerFind, searchFrom);
 
                   if (index < 0) {
                     break;
@@ -2368,16 +2334,13 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                     index,
                     find.length,
                     replacement,
-                    TextSelection.collapsed(
-                      offset: index + replacement.length,
-                    ),
+                    TextSelection.collapsed(offset: index + replacement.length),
                   );
 
                   replacements++;
                   searchFrom = index + replacement.length;
 
-                  final updatedText =
-                      _quillController.document.toPlainText();
+                  final updatedText = _quillController.document.toPlainText();
 
                   if (searchFrom > updatedText.length) {
                     break;
@@ -6552,7 +6515,6 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     );
   }
 
-
   /// Step 16C foundation:
   /// Calculates the printable width available to each column.
   /// The Quill document remains a single source of truth.
@@ -6584,20 +6546,20 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         continue;
       }
 
-      final int charsPerLine =
-          math.max(8, (usableWidth / math.max(5.0, _fontSize * 0.55)).floor());
-
-      estimatedLines += math.max(
-        1,
-        (paragraph.length / charsPerLine).ceil(),
+      final int charsPerLine = math.max(
+        8,
+        (usableWidth / math.max(5.0, _fontSize * 0.55)).floor(),
       );
+
+      estimatedLines += math.max(1, (paragraph.length / charsPerLine).ceil());
     }
 
-    final int linesPerPage =
-        math.max(1, (usableHeight / fontHeight).floor());
+    final int linesPerPage = math.max(1, (usableHeight / fontHeight).floor());
 
-    final int estimatedPages =
-        math.max(1, (estimatedLines / linesPerPage).ceil());
+    final int estimatedPages = math.max(
+      1,
+      (estimatedLines / linesPerPage).ceil(),
+    );
 
     return estimatedPages;
   }
@@ -6620,7 +6582,8 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     return List<double>.filled(count, width);
   }
 
-  final List<quill.QuillController> _columnControllers = <quill.QuillController>[];
+  final List<quill.QuillController> _columnControllers =
+      <quill.QuillController>[];
   bool _syncingColumnEditors = false;
 
   void _disposeColumnControllers() {
@@ -6641,12 +6604,12 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
     _syncingColumnEditors = true;
 
-    final String merged = _columnControllers
-        .map(_columnPlainText)
-        .join();
+    final String merged = _columnControllers.map(_columnPlainText).join();
 
-    final String current =
-        _quillController.document.toPlainText().replaceFirst(RegExp(r'\n$'), '');
+    final String current = _quillController.document.toPlainText().replaceFirst(
+      RegExp(r'\n$'),
+      '',
+    );
 
     if (merged != current) {
       _quillController.document = quill.Document.fromJson([
@@ -6664,9 +6627,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     }
   }
 
-  void _rebuildColumnEditors({
-    required List<String> parts,
-  }) {
+  void _rebuildColumnEditors({required List<String> parts}) {
     _syncingColumnEditors = true;
 
     _disposeColumnControllers();
@@ -6697,19 +6658,17 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     }
 
     final double fontSize = _fontSize.clamp(8.0, 96.0);
-    final double lineHeight =
-        math.max(12.0, fontSize * _lineSpacing * 1.45);
-    final double averageCharWidth =
-        math.max(4.0, fontSize * 0.52);
+    final double lineHeight = math.max(12.0, fontSize * _lineSpacing * 1.45);
+    final double averageCharWidth = math.max(4.0, fontSize * 0.52);
 
-    final int charsPerLine =
-        math.max(10, (columnWidth / averageCharWidth).floor());
+    final int charsPerLine = math.max(
+      10,
+      (columnWidth / averageCharWidth).floor(),
+    );
 
-    final int linesPerColumn =
-        math.max(1, (columnHeight / lineHeight).floor());
+    final int linesPerColumn = math.max(1, (columnHeight / lineHeight).floor());
 
-    final int capacity =
-        math.max(charsPerLine, charsPerLine * linesPerColumn);
+    final int capacity = math.max(charsPerLine, charsPerLine * linesPerColumn);
 
     final List<String> result = <String>[];
 
@@ -6719,16 +6678,12 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
       int end = math.min(source.length, cursor + capacity);
 
       if (end < source.length) {
-        final int newline =
-            source.lastIndexOf('\n', end - 1);
-        final int space =
-            source.lastIndexOf(' ', end - 1);
+        final int newline = source.lastIndexOf('\n', end - 1);
+        final int space = source.lastIndexOf(' ', end - 1);
 
-        final int boundary =
-            math.max(newline, space);
+        final int boundary = math.max(newline, space);
 
-        if (boundary >
-            cursor + math.max(1, (capacity * 0.55).floor())) {
+        if (boundary > cursor + math.max(1, (capacity * 0.55).floor())) {
           end = boundary + 1;
         }
       }
@@ -6784,86 +6739,37 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     required double contentWidth,
     required double contentHeight,
   }) {
-    final int count = _columns.clamp(1, 4);
-
-    if (count == 1) {
-      _disposeColumnControllers();
-
-      return SizedBox(
-        width: contentWidth,
-        height: contentHeight,
-        child: quill.QuillEditor.basic(
-          controller: _quillController,
-          config: quill.QuillEditorConfig(
-            padding: EdgeInsets.zero,
-            autoFocus: false,
-            expands: false,
-            scrollable: true,
-            enableInteractiveSelection: true,
-            enableSelectionToolbar: true,
-            placeholder: 'Start typing...',
-            embedBuilders: [
-              TayyibTableEmbedBuilder(),
-              TayyibTextBoxEmbedBuilder(),
-              TayyibWordArtEmbedBuilder(),
-              TayyibPictureEmbedBuilder(),
-              TayyibShapeEmbedBuilder(),
-              TayyibChartEmbedBuilder(),
-              TayyibEquationEmbedBuilder(),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final List<double> widths =
-        _calculateColumnWidths(contentWidth);
-
-    final double gap = switch (count) {
-      2 => 24.0,
-      3 => 18.0,
-      _ => 14.0,
-    };
-
-    final String source =
-        _quillController.document.toPlainText()
-            .replaceFirst(RegExp(r'\n$'), '');
-
-    final List<String> parts = _splitTextForColumns(
-      source: source,
-      count: count,
-      columnWidth: widths.first,
-      columnHeight: contentHeight,
-    );
-
-    final bool needsRebuild =
-        _columnControllers.length != count ||
-        _columnControllers.length != parts.length;
-
-    if (needsRebuild) {
-      _rebuildColumnEditors(parts: parts);
-    }
-
-    if (_columnControllers.length != count) {
-      return const SizedBox.shrink();
-    }
-
+    // Keep one Quill document as the single source of truth.
+    // The previous implementation split the document into several
+    // independent QuillControllers and merged plain text back, which
+    // destroyed formatting/embeds and caused cursor/editing problems.
+    //
+    // Flutter Quill does not provide true newspaper-style flowing
+    // columns, so until a dedicated multi-column layout engine is used,
+    // we deliberately keep the editor continuous and lossless.
     return SizedBox(
       width: contentWidth,
       height: contentHeight,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (int i = 0; i < count; i++) ...[
-            _buildColumnEditor(
-              _columnControllers[i],
-              widths[i],
-              contentHeight,
-            ),
-            if (i < count - 1)
-              SizedBox(width: gap),
+      child: quill.QuillEditor.basic(
+        controller: _quillController,
+        config: quill.QuillEditorConfig(
+          padding: EdgeInsets.zero,
+          autoFocus: false,
+          expands: false,
+          scrollable: true,
+          enableInteractiveSelection: true,
+          enableSelectionToolbar: true,
+          placeholder: 'Start typing...',
+          embedBuilders: [
+            TayyibTableEmbedBuilder(),
+            TayyibTextBoxEmbedBuilder(),
+            TayyibWordArtEmbedBuilder(),
+            TayyibPictureEmbedBuilder(),
+            TayyibShapeEmbedBuilder(),
+            TayyibChartEmbedBuilder(),
+            TayyibEquationEmbedBuilder(),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -6877,13 +6783,13 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     final double pageWidth = webLayout ? 900.0 : basePageWidth;
     final double pageHeight = webLayout ? 1100.0 : basePageHeight;
 
-    final double contentWidth =
-        (pageWidth - _marginLeft - _marginRight)
-            .clamp(120.0, pageWidth);
+    final double contentWidth = (pageWidth - _marginLeft - _marginRight).clamp(
+      120.0,
+      pageWidth,
+    );
 
-    final double contentHeight =
-        (pageHeight - _marginTop - _marginBottom)
-            .clamp(200.0, pageHeight);
+    final double contentHeight = (pageHeight - _marginTop - _marginBottom)
+        .clamp(200.0, pageHeight);
 
     // The document is now a continuous flow instead of one fixed page.
     // We estimate a safe minimum number of pages from the current
@@ -6892,11 +6798,9 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
     // Estimate wrapped lines from the actual printable width.
     // This keeps pagination responsive to margins, orientation and font size.
-    final double safeFontSize =
-        _fontSize.clamp(8.0, 96.0);
+    final double safeFontSize = _fontSize.clamp(8.0, 96.0);
 
-    final double averageCharWidth =
-        math.max(4.0, safeFontSize * 0.52);
+    final double averageCharWidth = math.max(4.0, safeFontSize * 0.52);
 
     final int charsPerLine = math.max(
       8,
@@ -6908,29 +6812,26 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     for (final String paragraph in plainText.split('\n')) {
       final int length = paragraph.length;
 
-      lineEstimate += math.max(
-        1,
-        (length / charsPerLine).ceil(),
-      );
+      lineEstimate += math.max(1, (length / charsPerLine).ceil());
     }
 
-    final double estimatedLineHeight =
-        math.max(
-          12.0,
-          safeFontSize * _lineSpacing * 1.45,
-        );
+    final double estimatedLineHeight = math.max(
+      12.0,
+      safeFontSize * _lineSpacing * 1.45,
+    );
 
-    final double estimatedContentHeight =
-        math.max(
-          contentHeight,
-          lineEstimate * estimatedLineHeight,
-        );
+    final double estimatedContentHeight = math.max(
+      contentHeight,
+      lineEstimate * estimatedLineHeight,
+    );
 
     // Keep the document flow on whole-page boundaries.
     // This preserves one Quill document while giving the page painter
     // enough height to render consecutive A4/Letter-style pages cleanly.
-    final double usablePageHeight =
-        math.max(200.0, pageHeight - _marginTop - _marginBottom);
+    final double usablePageHeight = math.max(
+      200.0,
+      pageHeight - _marginTop - _marginBottom,
+    );
 
     final int pageCount = math.max(
       1,
@@ -6938,9 +6839,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     );
 
     final double pageFlowHeight =
-        (pageCount * usablePageHeight) +
-        _marginTop +
-        _marginBottom;
+        (pageCount * usablePageHeight) + _marginTop + _marginBottom;
 
     // Keep a little breathing room between printed pages while the
     // document is shown as one continuous scrollable surface.
@@ -6950,9 +6849,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     // Web Layout remains a continuous document without page breaks.
     final double documentFlowHeight =
         pageFlowHeight +
-        (webLayout
-            ? 0.0
-            : math.max(0, pageCount - 1) * pageGap);
+        (webLayout ? 0.0 : math.max(0, pageCount - 1) * pageGap);
 
     final double scaledPageWidth = pageWidth * _zoom;
 
@@ -6975,9 +6872,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
               watermark: _watermark,
             ),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: documentFlowHeight,
-              ),
+              constraints: BoxConstraints(minHeight: documentFlowHeight),
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
                   _marginLeft,
@@ -7000,9 +6895,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
     );
 
     Widget editorBody = Container(
-      color: webLayout
-          ? const Color(0xFFF1F3F5)
-          : const Color(0xFFD9D9D9),
+      color: webLayout ? const Color(0xFFF1F3F5) : const Color(0xFFD9D9D9),
       child: SingleChildScrollView(
         padding: EdgeInsets.only(
           top: webLayout ? 18 : 8,
@@ -7013,14 +6906,9 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         child: Column(
           children: [
             if (_showRuler)
-              _buildDocumentRuler(
-                pageWidth: pageWidth,
-                webLayout: webLayout,
-              ),
+              _buildDocumentRuler(pageWidth: pageWidth, webLayout: webLayout),
             const SizedBox(height: 6),
-            Center(
-              child: editorContent,
-            ),
+            Center(child: editorContent),
           ],
         ),
       ),
@@ -7032,10 +6920,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         child: Column(
           children: [
             if (_showRuler)
-              _buildDocumentRuler(
-                pageWidth: pageWidth,
-                webLayout: true,
-              ),
+              _buildDocumentRuler(pageWidth: pageWidth, webLayout: true),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(
@@ -7044,9 +6929,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                   left: 12,
                   right: 12,
                 ),
-                child: Center(
-                  child: editorContent,
-                ),
+                child: Center(child: editorContent),
               ),
             ),
           ],
@@ -7071,8 +6954,10 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
               pageGap;
 
           final int calculatedPage =
-              ((notification.metrics.pixels / pageExtent).floor() + 1)
-                  .clamp(1, pageCount);
+              ((notification.metrics.pixels / pageExtent).floor() + 1).clamp(
+                1,
+                pageCount,
+              );
 
           if (calculatedPage != _currentPage && mounted) {
             setState(() {
@@ -7191,21 +7076,17 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
         children: [
           Builder(
             builder: (context) {
-              final double pageHeight =
-                  _landscape ? 595.0 : 842.0;
+              final double pageHeight = _landscape ? 595.0 : 842.0;
 
               final double contentHeight =
-                  (pageHeight - _marginTop - _marginBottom)
-                      .clamp(200.0, pageHeight);
+                  (pageHeight - _marginTop - _marginBottom).clamp(
+                    200.0,
+                    pageHeight,
+                  );
 
               final double contentWidth =
-                  ((_landscape ? 842.0 : 595.0) -
-                          _marginLeft -
-                          _marginRight)
-                      .clamp(
-                        120.0,
-                        _landscape ? 842.0 : 595.0,
-                      );
+                  ((_landscape ? 842.0 : 595.0) - _marginLeft - _marginRight)
+                      .clamp(120.0, _landscape ? 842.0 : 595.0);
 
               final int pages = _calculateDocumentPageCount(
                 plainText: _quillController.document.toPlainText(),
@@ -7218,10 +7099,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
 
               return Text(
                 'Page $_currentPage of $pages',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 11),
               );
             },
           ),
