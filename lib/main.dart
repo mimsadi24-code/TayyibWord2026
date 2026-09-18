@@ -45,6 +45,483 @@ class TayyibEquationEmbed extends quill.CustomBlockEmbed {
   }
 }
 
+// ============================================================
+// TAYYIB WORD - COMMON OBJECT INTERACTION LAYER
+// ============================================================
+//
+// This layer provides:
+//   • select
+//   • drag / move
+//   • pinch resize
+//   • two-finger rotate
+//   • long-press object menu
+//   • reset
+//   • delete
+//
+// Quill remains the document source of truth.
+//
+// IMPORTANT:
+// Page Layout -> Columns is intentionally untouched.
+// ============================================================
+
+class TayyibObjectInteraction extends StatefulWidget {
+  final quill.EmbedContext embedContext;
+  final quill.EmbedBuilder childBuilder;
+  final String embedType;
+  final Map<String, dynamic> data;
+
+  const TayyibObjectInteraction({
+    super.key,
+    required this.embedContext,
+    required this.childBuilder,
+    required this.embedType,
+    required this.data,
+  });
+
+  @override
+  State<TayyibObjectInteraction> createState() =>
+      _TayyibObjectInteractionState();
+}
+
+class _TayyibObjectInteractionState extends State<TayyibObjectInteraction> {
+  double _x = 0;
+  double _y = 0;
+  double _scale = 1;
+  double _rotation = 0;
+
+  double _startX = 0;
+  double _startY = 0;
+  double _startScale = 1;
+  double _startRotation = 0;
+
+  Offset _startFocalPoint = Offset.zero;
+  bool _selected = false;
+  bool _writing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _readTransform();
+  }
+
+  void _readTransform() {
+    final d = widget.data;
+
+    double number(dynamic value, double fallback) {
+      if (value is num) return value.toDouble();
+      return double.tryParse('$value') ?? fallback;
+    }
+
+    _x = number(d['x'], 0);
+    _y = number(d['y'], 0);
+    _scale = number(d['scale'], 1).clamp(0.25, 4.0);
+    _rotation = number(d['rotation'], 0);
+  }
+
+  void _selectObject() {
+    if (!_selected) {
+      setState(() {
+        _selected = true;
+      });
+    }
+
+    final offset = widget.embedContext.node.documentOffset;
+
+    widget.embedContext.controller.updateSelection(
+      TextSelection.collapsed(offset: offset),
+      quill.ChangeSource.local,
+    );
+  }
+
+  void _startGesture(ScaleStartDetails details) {
+    _selectObject();
+
+    _startX = _x;
+    _startY = _y;
+    _startScale = _scale;
+    _startRotation = _rotation;
+    _startFocalPoint = details.focalPoint;
+  }
+
+  void _updateGesture(ScaleUpdateDetails details) {
+    final dx = details.focalPoint.dx - _startFocalPoint.dx;
+    final dy = details.focalPoint.dy - _startFocalPoint.dy;
+
+    setState(() {
+      // One finger = move.
+      if (details.pointerCount <= 1) {
+        _x = _startX + dx;
+        _y = _startY + dy;
+      }
+
+      // Two fingers = resize + rotate.
+      if (details.pointerCount >= 2) {
+        _scale = (_startScale * details.scale).clamp(0.25, 4.0);
+        _rotation = _startRotation + details.rotation;
+      }
+    });
+  }
+
+  void _endGesture(ScaleEndDetails details) {
+    _writeTransformToQuill();
+  }
+
+  void _writeTransformToQuill() {
+    if (_writing) return;
+
+    _writing = true;
+
+    try {
+      final updated = <String, dynamic>{
+        ...widget.data,
+        'x': _x,
+        'y': _y,
+        'scale': _scale,
+        'rotation': _rotation,
+      };
+
+      // Preserve the object's original geometry.
+      // The generic interaction layer changes scale while keeping
+      // width/height/size values already stored by the object.
+      if (widget.data.containsKey('width')) {
+        updated['width'] = widget.data['width'];
+      }
+      if (widget.data.containsKey('height')) {
+        updated['height'] = widget.data['height'];
+      }
+      if (widget.data.containsKey('size')) {
+        updated['size'] = widget.data['size'];
+      }
+
+      final offset = widget.embedContext.node.documentOffset;
+
+      final replacement = quill.CustomBlockEmbed(
+        widget.embedType,
+        jsonEncode(updated),
+      );
+
+      widget.embedContext.controller.replaceText(
+        offset,
+        1,
+        replacement,
+        TextSelection.collapsed(offset: offset + 1),
+      );
+    } finally {
+      _writing = false;
+    }
+  }
+
+  Future<void> _showObjectMenu() async {
+    _selectObject();
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                leading: Icon(Icons.open_with),
+                title: Text('Object Controls'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.open_with),
+                title: const Text('Move'),
+                onTap: () => Navigator.pop(context, 'move'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_size_select_large),
+                title: const Text('Resize'),
+                onTap: () => Navigator.pop(context, 'resize'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.rotate_right),
+                title: const Text('Rotate'),
+                onTap: () => Navigator.pop(context, 'rotate'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.refresh),
+                title: const Text('Reset Object'),
+                onTap: () => Navigator.pop(context, 'reset'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Delete Object'),
+                onTap: () => Navigator.pop(context, 'delete'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) return;
+
+    if (action == 'reset') {
+      setState(() {
+        _x = 0;
+        _y = 0;
+        _scale = 1;
+        _rotation = 0;
+      });
+      _writeTransformToQuill();
+      return;
+    }
+
+    if (action == 'delete') {
+      final offset = widget.embedContext.node.documentOffset;
+
+      widget.embedContext.controller.replaceText(
+        offset,
+        1,
+        '',
+        TextSelection.collapsed(offset: offset),
+      );
+      return;
+    }
+
+    if (action == 'move') {
+      _showMoveDialog();
+      return;
+    }
+
+    if (action == 'resize') {
+      _showResizeDialog();
+      return;
+    }
+
+    if (action == 'rotate') {
+      _showRotateDialog();
+    }
+  }
+
+  Future<void> _showMoveDialog() async {
+    final xController = TextEditingController(text: _x.toStringAsFixed(0));
+    final yController = TextEditingController(text: _y.toStringAsFixed(0));
+
+    final result = await showDialog<List<double>>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Move Object'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: xController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                decoration: const InputDecoration(labelText: 'X position'),
+              ),
+              TextField(
+                controller: yController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+                decoration: const InputDecoration(labelText: 'Y position'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final x = double.tryParse(xController.text) ?? _x;
+                final y = double.tryParse(yController.text) ?? _y;
+                Navigator.pop(context, [x, y]);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+
+    xController.dispose();
+    yController.dispose();
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      _x = result[0];
+      _y = result[1];
+    });
+
+    _writeTransformToQuill();
+  }
+
+  Future<void> _showResizeDialog() async {
+    final controller = TextEditingController(
+      text: (_scale * 100).toStringAsFixed(0),
+    );
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Resize Object'),
+          content: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Scale (%)',
+              hintText: '100',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final percent =
+                    double.tryParse(controller.text) ?? (_scale * 100);
+                Navigator.pop(context, percent / 100);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      _scale = result.clamp(0.25, 4.0);
+    });
+
+    _writeTransformToQuill();
+  }
+
+  Future<void> _showRotateDialog() async {
+    final controller = TextEditingController(
+      text: (_rotation * 180 / math.pi).toStringAsFixed(0),
+    );
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Rotate Object'),
+          content: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: true,
+            ),
+            decoration: const InputDecoration(
+              labelText: 'Angle (degrees)',
+              hintText: '0',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final degrees =
+                    double.tryParse(controller.text) ??
+                    (_rotation * 180 / math.pi);
+                Navigator.pop(context, degrees * math.pi / 180);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      _rotation = result;
+    });
+
+    _writeTransformToQuill();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final child = widget.childBuilder.build(context, widget.embedContext);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _selectObject,
+      onDoubleTap: _showObjectMenu,
+      onLongPress: _showObjectMenu,
+      onScaleStart: _startGesture,
+      onScaleUpdate: _updateGesture,
+      onScaleEnd: _endGesture,
+      child: Transform.translate(
+        offset: Offset(_x, _y),
+        child: Transform.rotate(
+          angle: _rotation,
+          child: Transform.scale(
+            scale: _scale,
+            alignment: Alignment.center,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: _selected
+                    ? Border.all(color: Colors.green, width: 2)
+                    : null,
+              ),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TayyibObjectBuilder extends quill.EmbedBuilder {
+  final quill.EmbedBuilder inner;
+
+  TayyibObjectBuilder(this.inner);
+
+  @override
+  String get key => inner.key;
+
+  @override
+  Widget build(BuildContext context, quill.EmbedContext embedContext) {
+    Map<String, dynamic> data = <String, dynamic>{};
+
+    try {
+      final raw = embedContext.node.value.data;
+
+      if (raw is String && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+
+        if (decoded is Map) {
+          data = Map<String, dynamic>.from(decoded);
+        }
+      }
+    } catch (_) {}
+
+    return TayyibObjectInteraction(
+      embedContext: embedContext,
+      childBuilder: inner,
+      embedType: key,
+      data: data,
+    );
+  }
+}
+
 class TayyibEquationEmbedBuilder extends quill.EmbedBuilder {
   @override
   String get key => TayyibEquationEmbed.embedType;
@@ -140,76 +617,323 @@ class TayyibTableEmbedBuilder extends quill.EmbedBuilder {
       return const SizedBox.shrink();
     }
 
+    Map<String, dynamic> data;
+
     try {
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      final rows = (data['rows'] as num).toInt();
-      final columns = (data['columns'] as num).toInt();
-      final headerRow = data['headerRow'] == true;
-      final borderStyle = data['borderStyle']?.toString() ?? 'Full';
-      final rawCells = data['cells'] as List;
+      final decoded = jsonDecode(raw);
 
-      final cells = <List<String>>[];
-
-      for (var r = 0; r < rows; r++) {
-        final sourceRow = rawCells[r] as List;
-        cells.add([
-          for (var c = 0; c < columns; c++)
-            c < sourceRow.length ? '${sourceRow[c]}' : '',
-        ]);
+      if (decoded is Map) {
+        data = Map<String, dynamic>.from(decoded);
+      } else {
+        return const Text('[Table]');
       }
-
-      final borderColor = borderStyle == 'None'
-          ? Colors.transparent
-          : Colors.grey.shade500;
-
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Table(
-            defaultColumnWidth: const IntrinsicColumnWidth(),
-            border: TableBorder.all(
-              color: borderColor,
-              width: borderStyle == 'None' ? 0 : 1,
-            ),
-            children: [
-              for (var r = 0; r < rows; r++)
-                TableRow(
-                  decoration: r == 0 && headerRow
-                      ? BoxDecoration(color: Colors.grey.shade200)
-                      : null,
-                  children: [
-                    for (var c = 0; c < columns; c++)
-                      Container(
-                        constraints: const BoxConstraints(
-                          minWidth: 100,
-                          minHeight: 42,
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        child: TextField(
-                          controller: TextEditingController(text: cells[r][c]),
-                          maxLines: null,
-                          decoration: InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            hintText: r == 0 && headerRow
-                                ? 'Header ${c + 1}'
-                                : 'Cell ${r + 1},${c + 1}',
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      );
     } catch (_) {
       return const Text('[Table]');
     }
+
+    final rows = (data['rows'] as num?)?.toInt() ?? 1;
+    final columns = (data['columns'] as num?)?.toInt() ?? 1;
+    final headerRow = data['headerRow'] == true;
+    final borderStyle = data['borderStyle']?.toString() ?? 'Full';
+
+    final rawCells = data['cells'];
+    final cells = <List<String>>[];
+
+    for (int r = 0; r < rows; r++) {
+      final row = rawCells is List && r < rawCells.length ? rawCells[r] : null;
+
+      final resultRow = <String>[];
+
+      for (int c = 0; c < columns; c++) {
+        if (row is List && c < row.length) {
+          resultRow.add('${row[c]}');
+        } else {
+          resultRow.add('');
+        }
+      }
+
+      cells.add(resultRow);
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onDoubleTap: () {
+        _editTable(context, embedContext, data);
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth.isFinite
+                ? constraints.maxWidth
+                : columns * 110.0;
+
+            final cellWidth = width / math.max(columns, 1);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (int r = 0; r < rows; r++)
+                  SizedBox(
+                    height: 44,
+                    child: Row(
+                      children: [
+                        for (int c = 0; c < columns; c++)
+                          SizedBox(
+                            width: cellWidth,
+                            child: Container(
+                              alignment: Alignment.centerLeft,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: r == 0 && headerRow
+                                    ? const Color(0xFFE7E6E6)
+                                    : Colors.white,
+                                border: borderStyle == 'None'
+                                    ? null
+                                    : Border.all(
+                                        color: const Color(0xFF808080),
+                                        width: 1,
+                                      ),
+                              ),
+                              child: Text(
+                                cells[r][c],
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: r == 0 && headerRow
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editTable(
+    BuildContext context,
+    quill.EmbedContext embedContext,
+    Map<String, dynamic> original,
+  ) async {
+    int rows = (original['rows'] as num?)?.toInt() ?? 1;
+
+    int columns = (original['columns'] as num?)?.toInt() ?? 1;
+
+    bool headerRow = original['headerRow'] == true;
+
+    String borderStyle = original['borderStyle']?.toString() ?? 'Full';
+
+    final rawCells = original['cells'];
+
+    final cells = <List<String>>[];
+
+    for (int r = 0; r < rows; r++) {
+      final sourceRow = rawCells is List && r < rawCells.length
+          ? rawCells[r]
+          : null;
+
+      final row = <String>[];
+
+      for (int c = 0; c < columns; c++) {
+        if (sourceRow is List && c < sourceRow.length) {
+          row.add('${sourceRow[c]}');
+        } else {
+          row.add('');
+        }
+      }
+
+      cells.add(row);
+    }
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Table Properties'),
+              content: SizedBox(
+                width: 720,
+                height: 520,
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Text('Rows: $rows'),
+                        IconButton(
+                          tooltip: 'Add Row',
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            setDialogState(() {
+                              cells.add(List<String>.filled(columns, ''));
+                              rows++;
+                            });
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'Delete Row',
+                          icon: const Icon(Icons.remove),
+                          onPressed: rows <= 1
+                              ? null
+                              : () {
+                                  setDialogState(() {
+                                    cells.removeLast();
+                                    rows--;
+                                  });
+                                },
+                        ),
+                        const SizedBox(width: 24),
+                        Text('Columns: $columns'),
+                        IconButton(
+                          tooltip: 'Add Column',
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            setDialogState(() {
+                              for (final row in cells) {
+                                row.add('');
+                              }
+                              columns++;
+                            });
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'Delete Column',
+                          icon: const Icon(Icons.remove),
+                          onPressed: columns <= 1
+                              ? null
+                              : () {
+                                  setDialogState(() {
+                                    for (final row in cells) {
+                                      if (row.isNotEmpty) {
+                                        row.removeLast();
+                                      }
+                                    }
+                                    columns--;
+                                  });
+                                },
+                        ),
+                        const Spacer(),
+                        Checkbox(
+                          value: headerRow,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              headerRow = value ?? false;
+                            });
+                          },
+                        ),
+                        const Text('Header'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: borderStyle,
+                      decoration: const InputDecoration(
+                        labelText: 'Borders',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Full', child: Text('Full')),
+                        DropdownMenuItem(value: 'Outer', child: Text('Outer')),
+                        DropdownMenuItem(value: 'None', child: Text('None')),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() {
+                          borderStyle = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            for (int r = 0; r < rows; r++)
+                              Row(
+                                children: [
+                                  for (int c = 0; c < columns; c++)
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(3),
+                                        child: TextFormField(
+                                          initialValue: cells[r][c],
+                                          maxLines: 2,
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            labelText: '${r + 1},${c + 1}',
+                                            border: const OutlineInputBorder(),
+                                          ),
+                                          onChanged: (value) {
+                                            cells[r][c] = value;
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext, <String, dynamic>{
+                      ...original,
+                      'rows': rows,
+                      'columns': columns,
+                      'headerRow': headerRow,
+                      'borderStyle': borderStyle,
+                      'cells': cells,
+                    });
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    final embed = quill.CustomBlockEmbed(
+      TayyibTableEmbed.embedType,
+      jsonEncode(result),
+    );
+
+    try {
+      embedContext.controller.replaceText(
+        embedContext.node.documentOffset,
+        1,
+        embed,
+        TextSelection.collapsed(offset: embedContext.node.documentOffset + 1),
+      );
+    } catch (_) {}
   }
 }
 
@@ -6723,12 +7447,12 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
           placeholder: 'Start typing...',
           embedBuilders: [
             TayyibTableEmbedBuilder(),
-            TayyibTextBoxEmbedBuilder(),
-            TayyibWordArtEmbedBuilder(),
-            TayyibPictureEmbedBuilder(),
-            TayyibShapeEmbedBuilder(),
-            TayyibChartEmbedBuilder(),
-            TayyibEquationEmbedBuilder(),
+            TayyibObjectBuilder(TayyibTextBoxEmbedBuilder()),
+            TayyibObjectBuilder(TayyibWordArtEmbedBuilder()),
+            TayyibObjectBuilder(TayyibPictureEmbedBuilder()),
+            TayyibObjectBuilder(TayyibShapeEmbedBuilder()),
+            TayyibObjectBuilder(TayyibChartEmbedBuilder()),
+            TayyibObjectBuilder(TayyibEquationEmbedBuilder()),
           ],
         ),
       ),
@@ -6762,12 +7486,12 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
           placeholder: 'Start typing...',
           embedBuilders: [
             TayyibTableEmbedBuilder(),
-            TayyibTextBoxEmbedBuilder(),
-            TayyibWordArtEmbedBuilder(),
-            TayyibPictureEmbedBuilder(),
-            TayyibShapeEmbedBuilder(),
-            TayyibChartEmbedBuilder(),
-            TayyibEquationEmbedBuilder(),
+            TayyibObjectBuilder(TayyibTextBoxEmbedBuilder()),
+            TayyibObjectBuilder(TayyibWordArtEmbedBuilder()),
+            TayyibObjectBuilder(TayyibPictureEmbedBuilder()),
+            TayyibObjectBuilder(TayyibShapeEmbedBuilder()),
+            TayyibObjectBuilder(TayyibChartEmbedBuilder()),
+            TayyibObjectBuilder(TayyibEquationEmbedBuilder()),
           ],
         ),
       ),
